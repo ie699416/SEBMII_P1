@@ -109,22 +109,9 @@ static const uint8_t ASCII[][5] = { { 0x00, 0x00, 0x00, 0x00, 0x00 } // 20
 };
 
 void LCDNokia_init(void) {
-	gpio_pin_config_t dataDirection = { kGPIO_DigitalOutput, 0, };
-	port_pin_config_t pinControl =
-		{ kPORT_PullDisable, kPORT_SlowSlewRate, kPORT_PassiveFilterDisable,
-				kPORT_OpenDrainDisable, kPORT_LowDriveStrength, kPORT_MuxAsGpio,
-	kPORT_UnlockRegister};
-	PORT_SetPinConfig(PORTD, 3, &pinControl);
-	PORT_SetPinConfig(PORTD, RESET_PIN, &pinControl);
-	GPIO_PinInit(GPIOD, 3, &dataDirection);
-	GPIO_PinInit(GPIOD, RESET_PIN, &dataDirection);
-
-
 	//Configure control pins
 
-	GPIO_ClearPinsOutput(GPIOD, RESET_PIN);
 	LCD_delay();
-	GPIO_SetPinsOutput(GPIOD, RESET_PIN);
 	LCDNokia_writeByte(LCD_CMD, 0x21); //Tell LCD that extended commands follow
 	LCDNokia_writeByte(LCD_CMD, 0xB1); //Set LCD Vop (Contrast): Try 0xBF(good @ 3.3V) or 0xBF if your display is too dark
 	LCDNokia_writeByte(LCD_CMD, 0x04); //Set Temp coefficent
@@ -146,9 +133,19 @@ void LCDNokia_writeByte(uint8_t DataOrCmd, uint8_t data) {
 	else
 		GPIO_ClearPinsOutput(GPIOD, DATA_OR_CMD_PIN);
 
-	SPI_startTranference(SPI0);
-	SPI_sendOneByte(SPI0, data);
-	SPI_stopTranference(SPI0);
+	dspi_command_data_config_t commandConfig;
+	commandConfig.isPcsContinuous = true;
+	commandConfig.whichCtar = 0;
+	commandConfig.whichPcs = 0;
+	commandConfig.clearTransferCount = false;
+	commandConfig.isEndOfQueue = false;
+
+	//DSPI_GetDefaultDataCommandConfig(&command);
+
+	DSPI_StartTransfer(SPI0);
+
+	DSPI_MasterWriteData(SPI0, &commandConfig, data);
+	DSPI_StopTransfer(SPI0);
 }
 
 void LCDNokia_sendChar(uint8_t character) {
