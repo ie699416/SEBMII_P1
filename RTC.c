@@ -61,7 +61,7 @@
 #define I2C0_BASEADDR I2C0
 #define RTC_slave_address 0x51
 #define I2C_MASTER_CLK I2C0_CLK_SRC
-#define BUFFER_SIZE 1
+#define BUFFER_SIZE 2
 
 /*
  * @brief   Application entry point.
@@ -121,22 +121,19 @@ int main(void) {
 
 
     i2c_master_transfer_t masterXfer;
-    //uint8_t txBuff[BUFFER_SIZE];
-        uint8_t data_buffer = 0x00;
+     uint8_t data_buff = 0x00;
 
      //Init I2C master.
     masterXfer.slaveAddress = 0x51;
     masterXfer.direction =  kI2C_Write;
     masterXfer.subaddress = 0x00;
     masterXfer.subaddressSize = 1;
-    masterXfer.data = &data_buffer;
+    masterXfer.data = &data_buff;
     masterXfer.dataSize = 1;
     masterXfer.flags = kI2C_TransferDefaultFlag;
 
     I2C_MasterTransferNonBlocking(I2C0_BASEADDR, &g_m_handle, &masterXfer);
 
-
-    ///////////////SE QUEDA EN EL WHILE POR SIEMPRE///////////////////////////
      //Wait for transfer completed.
     while (!g_MasterCompletionFlag)
     {
@@ -144,16 +141,22 @@ int main(void) {
 
     g_MasterCompletionFlag = false;
 
+    uint8_t read_buffer;
+    masterXfer.slaveAddress = 0x51;
+    masterXfer.direction = kI2C_Read;
+    masterXfer.subaddress = 0x02;
+    masterXfer.subaddressSize = 1;
+    masterXfer.data = &read_buffer;
+    masterXfer.dataSize = 1;
+    masterXfer.flags = kI2C_TransferDefaultFlag;
+while (1)
+{
+ I2C_MasterTransferNonBlocking(I2C0, &g_m_handle,
+         &masterXfer);
+ while (!g_MasterCompletionFlag){}
+ g_MasterCompletionFlag = false;
+ PRINTF("%x\r", read_buffer);
+}
 
-
-    /////////////NO SE EJECUTA ESTA INSTRUCCION/////////////////////////
-    printf("Keep going\r");
-
-   //  Force the counter to be placed into memory.
-    volatile static int i = 0 ;
-   //  Enter an infinite loop, just incrementing a counter.
-    while(1) {
-        i++ ;
-    }
     return 0 ;
 }
