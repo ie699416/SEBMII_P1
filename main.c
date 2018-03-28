@@ -41,6 +41,7 @@
 #include "fsl_debug_console.h"
 #include "main_tasks.h"
 #include "FreeRTOS.h"
+#include "fsl_port.h"
 
 /*
  * @brief   Application entry point.
@@ -60,10 +61,26 @@ int main(void) {
 	xTaskCreate(sInitLCD_task, "LCD Nokia init", 200, NULL,
 	configMAX_PRIORITIES, NULL);
 
-	NVIC_EnableIRQ(SPI0_IRQn);
 
+    CLOCK_EnableClock(kCLOCK_PortC);
+   	CLOCK_EnableClock(kCLOCK_Uart1);
+
+    	port_pin_config_t config_uart =
+    	{ kPORT_PullDisable, kPORT_SlowSlewRate, kPORT_PassiveFilterDisable,
+    	        kPORT_OpenDrainDisable, kPORT_LowDriveStrength, kPORT_MuxAlt3,
+    	        kPORT_UnlockRegister, };
+
+    	PORT_SetPinConfig(PORTC, 4, &config_uart);
+    	PORT_SetPinConfig(PORTC, 3, &config_uart);
+
+
+
+
+	NVIC_EnableIRQ(SPI0_IRQn);
+	NVIC_EnableIRQ(UART1_RX_TX_IRQn);
 	NVIC_EnableIRQ(UART0_RX_TX_IRQn);
 	NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
+	NVIC_SetPriority(UART1_RX_TX_IRQn, 5);
 	NVIC_SetPriority(SPI0_IRQn, 4);
 
 	vTaskStartScheduler();

@@ -1357,8 +1357,9 @@ void UART5_RX_TX_DriverIRQHandler(void)
     __DSB();
 #endif
 }
+/*
 
-//#define UART0IRQ
+#define UART0IRQ
 
 #ifdef UART0IRQ
 
@@ -1371,6 +1372,7 @@ void UART0_RX_TX_IRQHandler(void) {
 }
 
 #endif
+*/
 
 
 #endif

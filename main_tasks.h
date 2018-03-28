@@ -126,7 +126,9 @@ void sEchoLCD_task(void *arg);
   * @param void pointer for input parameters
   */
 
- void uPrintHello_task(void * arg);
+ void UART1_PrintHello_task(void * arg);
+
+ void UART0_PrintHello_task(void * arg);
 
  /**********************************************************************************************************************
   * I2C Tasks

@@ -10,6 +10,7 @@
 #include "fsl_uart.h"
 #include "fsl_i2c.h"
 #include "fsl_debug_console.h"
+#include "MK64F12.h"
 
 extern const uint8_t ITESO[];
 
@@ -52,12 +53,6 @@ static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
 }
 
 void iReadRTC_task(void * arg) {
-	// Init board hardware.
-	BOARD_InitBootPins();
-	BOARD_InitBootClocks();
-	BOARD_InitBootPeripherals();
-	//Init FSL debug console.
-	BOARD_InitDebugConsole();
 
 	CLOCK_EnableClock(kCLOCK_I2c0);
 	CLOCK_EnableClock(kCLOCK_PortB);
@@ -128,7 +123,8 @@ void sInitLCD_task(void * arg) {
 	xTaskCreate(sItesoLCD_task, "LCD Nokia Print", 200, NULL,
 	configMAX_PRIORITIES, NULL);
 
-	xTaskCreate(uPrintHello_task, "Hello", 200, NULL, configMAX_PRIORITIES - 1, NULL);
+	xTaskCreate(UART1_PrintHello_task, "Hello1", 200, NULL, configMAX_PRIORITIES - 1, NULL);
+	xTaskCreate(UART0_PrintHello_task, "Hello0", 200, NULL, configMAX_PRIORITIES - 1, NULL);
 
 	xTaskCreate(iReadRTC_task, "RTC read", 200, NULL,
 	configMAX_PRIORITIES - 2, NULL);
@@ -161,7 +157,7 @@ void sItesoLCD_task(void * arg) {
 volatile bool txFinished;
 volatile bool rxFinished;
 
-void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
+void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 		void *userData) {
 	userData = userData;
 	if (kStatus_UART_TxIdle == status) {
@@ -172,7 +168,72 @@ void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 	}
 }
 
-void uPrintHello_task(void * arg) {
+void UART1_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
+		void *userData) {
+	userData = userData;
+	if (kStatus_UART_TxIdle == status) {
+		txFinished = true;
+	}
+	if (kStatus_UART_RxIdle == status) {
+		rxFinished = true;
+	}
+}
+void UART1_PrintHello_task(void * arg) {
+
+//	CLOCK_EnableClock(kCLOCK_Uart0);
+	CLOCK_EnableClock(kCLOCK_Uart1);
+	void *userData;
+	uart_handle_t g_uartHandle;
+	uart_config_t user_config;
+	uart_transfer_t sendXfer;
+	uart_transfer_t receiveXfer;
+
+
+	uint8_t sendData[] = { 'H', 'e', 'l', 'l', 'o' };
+	uint8_t receiveData[32];
+
+//...
+	UART_GetDefaultConfig(&user_config);
+	user_config.baudRate_Bps = 9600;
+	user_config.enableTx = true;
+	user_config.enableRx = true;
+//	UART_Init(UART0, &user_config, CLOCK_GetFreq(UART0_CLK_SRC));
+//	UART_TransferCreateHandle(UART0, &g_uartHandle, UART_UserCallback,
+//			userData);
+	UART_Init(UART1, &user_config, CLOCK_GetFreq(UART1_CLK_SRC));
+		UART_TransferCreateHandle(UART1, &g_uartHandle, UART1_UserCallback,
+				userData);
+
+
+// Prepare to send.
+	sendXfer.data = sendData;
+	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
+	txFinished = false;
+// Send out.
+	UART_TransferSendNonBlocking(UART1, &g_uartHandle, &sendXfer);
+	// Wait send finished.
+			while (!txFinished) {}
+	for (;;) {
+
+
+
+// Prepare to receive.
+		receiveXfer.data = receiveData;
+		receiveXfer.dataSize = sizeof(receiveData) / sizeof(receiveData[0]);
+		rxFinished = false;
+
+		UART_TransferReceiveNonBlocking(UART1, &g_uartHandle,  &receiveXfer,NULL);
+
+				vTaskDelay(pdMS_TO_TICKS(500));
+// ...
+
+	}
+
+}
+
+
+void UART0_PrintHello_task(void * arg) {
+
 
 	CLOCK_EnableClock(kCLOCK_Uart0);
 	void *userData;
@@ -181,7 +242,6 @@ void uPrintHello_task(void * arg) {
 	uart_transfer_t sendXfer;
 	uart_transfer_t receiveXfer;
 
-//		uart_transfer_callback_t callback1;// it's necessary to include?
 
 	uint8_t sendData[] = { 'H', 'e', 'l', 'l', 'o' };
 	uint8_t receiveData[32];
@@ -192,34 +252,32 @@ void uPrintHello_task(void * arg) {
 	user_config.enableTx = true;
 	user_config.enableRx = true;
 	UART_Init(UART0, &user_config, CLOCK_GetFreq(UART0_CLK_SRC));
-	//UART_CreateHandle(&g_uartHandle, UART1, NULL, 0);
-	UART_TransferCreateHandle(UART0, &g_uartHandle, UART_UserCallback,
+	UART_TransferCreateHandle(UART0, &g_uartHandle, UART0_UserCallback,
 			userData);
-	//UART_SetTransferCallback(&g_uartHandle, UART_UserCallback, NULL);
+
+
 // Prepare to send.
 	sendXfer.data = sendData;
 	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
 	txFinished = false;
 // Send out.
-
+	UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
+	// Wait send finished.
+			while (!txFinished) {}
 	for (;;) {
-//		UART_WriteNonBlocking(UART1, sendData, sendXfer.dataSize);
-		UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
-// Wait send finished.
-		if (!txFinished) {
+
+
 
 // Prepare to receive.
 		receiveXfer.data = receiveData;
 		receiveXfer.dataSize = sizeof(receiveData) / sizeof(receiveData[0]);
 		rxFinished = false;
-		}
 
-		vTaskDelay(pdMS_TO_TICKS(500));
+		UART_TransferReceiveNonBlocking(UART0, &g_uartHandle,  &receiveXfer,NULL);
 
-
+				vTaskDelay(pdMS_TO_TICKS(500));
 // ...
 
 	}
 
 }
-
