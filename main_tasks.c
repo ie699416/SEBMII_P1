@@ -331,6 +331,31 @@ void UART0_PrintHello_task(void * arg) {
 
 }
 
-void UART0_PrintSeconds_task(void * arg) {
+void uPrintEcho_task(void * arg) {
+
+
+	void *userData;
+	uart_handle_t g_uartHandle;
+	uart_transfer_t sendXfer;
+	uint8_t sendData[1] = { 0 };
+
+	UART_TransferCreateHandle( (UART_Type*) arg, &g_uartHandle, UART0_UserCallback,
+			userData);
+
+	// Prepare to send.
+	sendData[0] =  ((UART_Type*) arg)->D;
+	sendXfer.data = sendData;
+	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
+	txFinished = false;
+
+	// Send out.
+
+	UART_TransferSendNonBlocking( (UART_Type*) arg, &g_uartHandle, &sendXfer);
+	// Wait send finished.
+	while (!txFinished) {
+	}
+
+	vTaskDelete(NULL);
 
 }
+
