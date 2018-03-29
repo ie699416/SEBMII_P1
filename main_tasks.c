@@ -24,11 +24,7 @@ void delay(uint16_t delay) {
 #define RTC_slave_address 0x51
 #define I2C_MASTER_CLK I2C0_CLK_SRC
 #define BUFFER_SIZE 2
-
-/*
- * @brief   Application entry point.
- *
- */
+#define EEPROM_SLAVE_ADDR 0x50
 
 typedef enum {
 	CONTROL_STATUS,
@@ -43,7 +39,6 @@ typedef enum {
 } RTC_registers_t;
 
 volatile bool g_MasterCompletionFlag = false;
-
 static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
 		status_t status, void *userData) {
 	//Signal transfer success when received success status.
@@ -51,6 +46,83 @@ static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
 		g_MasterCompletionFlag = true;
 	}
 }
+
+void I2C_init(){
+
+	CLOCK_EnableClock(kCLOCK_I2c0);
+	CLOCK_EnableClock(kCLOCK_PortB);
+
+	port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
+			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
+			kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
+
+	PORT_SetPinConfig(PORTB, 2, &config_i2c);
+	PORT_SetPinConfig(PORTB, 3, &config_i2c);
+
+	i2c_master_config_t masterConfig;
+	I2C_MasterGetDefaultConfig(&masterConfig);
+	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
+}
+
+void Write_EEPROM(void * arg) {
+
+
+	i2c_master_handle_t g_m_handle;
+	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
+			i2c_master_callback, NULL);
+
+	i2c_master_transfer_t masterXfer;
+	uint8_t data_buff = 0x05;
+
+	//Init I2C master.
+	masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
+	masterXfer.direction = kI2C_Write;
+	masterXfer.subaddress = 0x00;
+	masterXfer.subaddressSize = 2;
+	masterXfer.data = &data_buff;
+	masterXfer.dataSize = 2;
+	masterXfer.flags = kI2C_TransferDefaultFlag;
+
+	I2C_MasterTransferNonBlocking(I2C0_BASEADDR, &g_m_handle, &masterXfer);
+
+	//Wait for transfer completed.
+	while (!g_MasterCompletionFlag) {
+	}
+
+	g_MasterCompletionFlag = false;
+
+	uint8_t read_buffer;
+	masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
+	masterXfer.direction = kI2C_Read;
+	masterXfer.subaddress = 0x00;
+	masterXfer.subaddressSize = 2;
+	masterXfer.data = &read_buffer;
+	masterXfer.dataSize = 2;
+	masterXfer.flags = kI2C_TransferDefaultFlag;
+
+	I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
+//			while (!g_MasterCompletionFlag) {}
+			g_MasterCompletionFlag = false;
+			PRINTF("%x\r", read_buffer);
+	for (;;) {
+
+
+
+		vTaskDelay(pdMS_TO_TICKS(1000));
+
+	}
+}
+
+
+
+//volatile bool g_MasterCompletionFlag = false;
+//static void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
+//		status_t status, void *userData) {
+//	//Signal transfer success when received success status.
+//	if (status == kStatus_Success) {
+//		g_MasterCompletionFlag = true;
+//	}
+//}
 
 void iReadRTC_task(void * arg) {
 
@@ -102,8 +174,7 @@ void iReadRTC_task(void * arg) {
 	masterXfer.flags = kI2C_TransferDefaultFlag;
 	for (;;) {
 		I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
-		while (!g_MasterCompletionFlag) {
-		}
+//		while (!g_MasterCompletionFlag) {}
 		g_MasterCompletionFlag = false;
 		PRINTF("%x\r", read_buffer);
 		vTaskDelay(pdMS_TO_TICKS(1000));
@@ -126,8 +197,8 @@ void sInitLCD_task(void * arg) {
 	xTaskCreate(UART1_PrintHello_task, "Hello1", 200, NULL, configMAX_PRIORITIES - 1, NULL);
 	xTaskCreate(UART0_PrintHello_task, "Hello0", 200, NULL, configMAX_PRIORITIES - 1, NULL);
 
-	xTaskCreate(iReadRTC_task, "RTC read", 200, NULL,
-	configMAX_PRIORITIES - 2, NULL);
+	xTaskCreate(iReadRTC_task, "RTC read", 200, NULL,configMAX_PRIORITIES - 2, NULL);
+	xTaskCreate(Write_EEPROM, "Write_EEPROM", 200, NULL,configMAX_PRIORITIES - 2, NULL);
 	vTaskDelete(NULL);
 }
 
@@ -157,6 +228,12 @@ void sItesoLCD_task(void * arg) {
 volatile bool txFinished;
 volatile bool rxFinished;
 
+	uart_handle_t g_uartHandle;
+	uart_config_t user_config;
+	uart_transfer_t sendXfer;
+	uart_transfer_t receiveXfer;
+	uint8_t receiveData[10];
+
 void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 		void *userData) {
 	userData = userData;
@@ -166,7 +243,18 @@ void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 	if (kStatus_UART_RxIdle == status) {
 		rxFinished = true;
 	}
+
+	// Prepare to receive.
+			receiveXfer.data = receiveData;
+			receiveXfer.dataSize = sizeof(receiveData) / sizeof(receiveData[0]);
+			rxFinished = false;
+
+			UART_TransferReceiveNonBlocking(UART0, &g_uartHandle,  &receiveXfer,NULL);
+
+
 }
+
+
 
 void UART1_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 		void *userData) {
@@ -177,37 +265,55 @@ void UART1_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 	if (kStatus_UART_RxIdle == status) {
 		rxFinished = true;
 	}
+
+
+	// Prepare to receive.
+			receiveXfer.data = receiveData;
+			receiveXfer.dataSize = sizeof(receiveData) / sizeof(receiveData[0]);
+			rxFinished = false;
+
+			UART_TransferReceiveNonBlocking(UART1, &g_uartHandle,  &receiveXfer,NULL);
+			// ...
 }
 void UART1_PrintHello_task(void * arg) {
 
 //	CLOCK_EnableClock(kCLOCK_Uart0);
 	CLOCK_EnableClock(kCLOCK_Uart1);
 	void *userData;
-	uart_handle_t g_uartHandle;
-	uart_config_t user_config;
-	uart_transfer_t sendXfer;
-	uart_transfer_t receiveXfer;
 
 
-	uint8_t sendData[] = { 'H', 'e', 'l', 'l', 'o' };
-	uint8_t receiveData[32];
+
+
+	uint8_t sendData[] =
+	{  "\n\n "
+			"\t1) Leer Memoria I2C \n\n\r"
+			"\t2) Escribir memoria I2C\n\n\r"
+			"\t3) Establecer Hora \n\n\r "
+			"\t4) Establecer Fecha \n\n\r"
+			"\t5) Formato de hora \n\n\r "
+			"\t6) Leer hora \n\n\r"
+			"\t7) Leer fecha \n\n\r"
+			"\t8) Comunicacion con terminal 2 \n\n\r"
+			"\t9) Eco en LCD \n\n\r"
+			"\t Ingrese opcion:"
+	};
+
 
 //...
 	UART_GetDefaultConfig(&user_config);
 	user_config.baudRate_Bps = 9600;
 	user_config.enableTx = true;
 	user_config.enableRx = true;
-//	UART_Init(UART0, &user_config, CLOCK_GetFreq(UART0_CLK_SRC));
-//	UART_TransferCreateHandle(UART0, &g_uartHandle, UART_UserCallback,
-//			userData);
+
 	UART_Init(UART1, &user_config, CLOCK_GetFreq(UART1_CLK_SRC));
 		UART_TransferCreateHandle(UART1, &g_uartHandle, UART1_UserCallback,
 				userData);
 
-
+		UART_WriteByte(UART1, 5);
 // Prepare to send.
 	sendXfer.data = sendData;
 	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
+
 	txFinished = false;
 // Send out.
 	UART_TransferSendNonBlocking(UART1, &g_uartHandle, &sendXfer);
@@ -223,9 +329,11 @@ void UART1_PrintHello_task(void * arg) {
 		rxFinished = false;
 
 		UART_TransferReceiveNonBlocking(UART1, &g_uartHandle,  &receiveXfer,NULL);
+		// ...
+
 
 				vTaskDelay(pdMS_TO_TICKS(500));
-// ...
+
 
 	}
 
