@@ -24,17 +24,16 @@
 
 #define I2C0_BASEADDR I2C0
 #define RTC_slave_address 0x51
+#define EEPROM_SLAVE_ADDR 0x50
 #define I2C_MASTER_CLK I2C0_CLK_SRC
 #define BUFFER_SIZE 2
 
 #define QUEUE_LENGTH 3
+#define QUEUE_LENGTH_UART 1
 #define QUEUE_ITEM_SIZE sizeof(uint8_t)
 
-#define I2C0_BASEADDR I2C0
-#define RTC_slave_address 0x51
-#define I2C_MASTER_CLK I2C0_CLK_SRC
-#define BUFFER_SIZE 2
-#define EEPROM_SLAVE_ADDR 0x50
+#define EVENT_UART_READ_EEPROM (1<<1)
+#define EVENT_UART_WRITE_EEPROM (1<<2)
 
 /****************************************************************************************************************/
 /*	Constant terminal info */
@@ -51,6 +50,8 @@ const uint8_t menu[] = { "\033[2J\r"
 		"\t9) Eco en LCD \n\n\r"
 		"\t Ingrese opcion:\n\n\r" };
 
+const uint8_t clear[] = { "8;
+
 extern const uint8_t ITESO[];
 
 /****************************************************************************************************************/
@@ -58,10 +59,9 @@ extern const uint8_t ITESO[];
 
 SemaphoreHandle_t mutex_TxRx;
 QueueHandle_t g_RTC_mailbox;
+QueueHandle_t g_UART_mailbox;
 
 EventGroupHandle_t g_UART_events;
-
-
 
 volatile bool g_MasterCompletionFlag = false;
 volatile bool txFinished;
@@ -103,6 +103,36 @@ void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 }
 
 /****************************************************************************************************************/
+/*	System Tasks*/
+
+void U0_systemMenu_task(void *arg) {
+
+	uint8_t xCharReceived;
+	UART0_putString(menu);
+
+	for (;;) {
+
+		if ( xQueueReceive(g_UART_mailbox, &xCharReceived,
+				portMAX_DELAY) == pdPASS) {
+			switch (xCharReceived) {
+			case '1':
+				xEventGroupSetBits(g_UART_events, EVENT_UART_READ_EEPROM);
+				break;
+			case '2':
+				break;
+			default:
+				break;
+			}
+
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(500));
+
+	}
+
+}
+
+/****************************************************************************************************************/
 /*	Init Tasks*/
 
 void I2C_init() {
@@ -120,6 +150,7 @@ void I2C_init() {
 	i2c_master_config_t masterConfig;
 	I2C_MasterGetDefaultConfig(&masterConfig);
 	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
+	vTaskDelete(NULL);
 }
 
 void sInitLCD_task(void * arg) {
@@ -133,18 +164,26 @@ void sInitLCD_task(void * arg) {
 	LCDNokia_init();
 
 	mutex_TxRx = xSemaphoreCreateMutex();
-	
+
 	g_UART_events = xEventGroupCreate();
 
-	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
+	g_UART_mailbox = xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
 
-	xTaskCreate(UART0_init_task, "UART0 init", 200, NULL,
-	configMAX_PRIORITIES, NULL);
+	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
 
 	xTaskCreate(sClockLCD_task, "LCD Nokia Print", 200, NULL,
 	configMAX_PRIORITIES, NULL);
 
+	xTaskCreate(UART0_init_task, "UART0 init", 200, NULL,
+	configMAX_PRIORITIES, NULL);
+
 	xTaskCreate(iReadRTC_task, "Read RTC seconds", 200, NULL,
+	configMAX_PRIORITIES - 1, NULL);
+
+	xTaskCreate(U0_systemMenu_task, "UART0 menu ", 200, NULL,
+	configMAX_PRIORITIES - 1, NULL);
+
+	xTaskCreate(UART0_readEEPROM_task, "UART0 menu 1 ", 200, NULL,
 	configMAX_PRIORITIES - 1, NULL);
 
 	xTaskCreate(UART0_PrintHello_task, "Hello0", 200, NULL,
@@ -153,9 +192,17 @@ void sInitLCD_task(void * arg) {
 	vTaskDelete(NULL);
 }
 
-
-
 void UART1_init_task(void * arg) {
+
+	CLOCK_EnableClock(kCLOCK_Uart1);
+	uart_config_t user_config;
+	UART_GetDefaultConfig(&user_config);
+	user_config.baudRate_Bps = 115200;
+	user_config.enableTx = true;
+	user_config.enableRx = true;
+
+	UART_Init(UART1, &user_config, CLOCK_GetFreq(UART1_CLK_SRC));
+	vTaskDelete(NULL);
 
 }
 
@@ -175,7 +222,6 @@ void UART0_init_task(void * arg) {
 
 /****************************************************************************************************************/
 /*	EEPROM Tasks*/
-
 
 void Write_EEPROM(void * arg) {
 
@@ -225,7 +271,6 @@ void Write_EEPROM(void * arg) {
 
 /****************************************************************************************************************/
 /*	RTC Tasks*/
-
 
 void iReadRTC_task(void * arg) {
 
@@ -301,7 +346,6 @@ void iReadRTC_task(void * arg) {
 	}
 }
 
-
 /****************************************************************************************************************/
 /*	LCD Tasks*/
 
@@ -312,7 +356,7 @@ void sClockLCD_task(void * arg) {
 
 	LCDNokia_clear();/*! It clears the information printed in the LCD*/
 	LCDNokia_bitmap(&ITESO[0]); /*! It prints an array that hold an image, in this case is the initial picture*/
-	delay(10000000);
+	vTaskDelay(pdMS_TO_TICKS(1000));
 	LCDNokia_clear();
 	LCDNokia_clear();
 	LCDNokia_gotoXY(5, 0); /*! It establishes the position to print the messages in the LCD*/
@@ -322,7 +366,7 @@ void sClockLCD_task(void * arg) {
 	LCDNokia_gotoXY(25, 4);
 	LCDNokia_sendString("2 0 1 8 ", 0); /*! It print a string stored in an array*/
 
-	delay(10000000);
+	vTaskDelay(pdMS_TO_TICKS(1000));
 #define RTC
 
 	for (;;) {
@@ -352,8 +396,8 @@ void sClockLCD_task(void * arg) {
 			LCDNokia_gotoXY(25, 4);
 			LCDNokia_sendString(sendData, 0); /*! It print a string stored in an array*/
 
-			UART_putString("\r");
-			UART_putString(sendData);
+			//UART_putString("\r");
+			//UART_putString(sendData);
 
 		}
 #endif
@@ -364,8 +408,6 @@ void sClockLCD_task(void * arg) {
 
 /****************************************************************************************************************/
 /*	PRINT Tasks*/
-
-
 
 void UART1_PrintHello_task(void * arg) {
 
@@ -423,8 +465,6 @@ void UART0_PrintHello_task(void * arg) {
 	uint8_t receiveData[1];
 	uint8_t echo[1] = { 0 };
 
-	UART_putString(menu);
-
 	//...
 
 	UART_TransferCreateHandle(UART0, &g_uartHandle, UART0_UserCallback,
@@ -438,6 +478,8 @@ void UART0_PrintHello_task(void * arg) {
 		if (true == rxFinished) {
 			rxFinished = false;
 
+			xQueueSendToBack(g_UART_mailbox, receiveXfer.data, 10);
+
 			sendXfer.data = receiveXfer.data;
 			sendXfer.dataSize = sizeof(echo) / sizeof(echo[0]);
 			txFinished = false;
@@ -445,8 +487,8 @@ void UART0_PrintHello_task(void * arg) {
 			UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
 			// Wait send finished.
 			while (!txFinished) {
-			}
 
+			}
 		}
 
 		UART_TransferReceiveNonBlocking(UART0, &g_uartHandle, &receiveXfer,
@@ -458,21 +500,19 @@ void UART0_PrintHello_task(void * arg) {
 /****************************************************************************************************************/
 /*	Local function*/
 
-void UART_putString(void * arg) {
-
-	uint8_t * dataToSend = (uint8_t*) arg;
+void UART0_putString(uint8_t * dataToSend) {
 
 	uart_handle_t g_uartHandle;
 	uart_transfer_t sendXfer;
 	uint8_t index = 0;
 
-	for (index = 0; (dataToSend[index] != '\0'); index++) {
+	for (index; (dataToSend[index] != '\0'); index++) {
 
 	}
 
 	uint8_t sendData[index];
 
-	UART_TransferCreateHandle(UART0, &g_uartHandle, UART1_UserCallback,
+	UART_TransferCreateHandle(UART0, &g_uartHandle, UART0_UserCallback,
 	NULL);
 
 	for (index = 0; (dataToSend[index] != '\0'); index++) {
@@ -488,11 +528,32 @@ void UART_putString(void * arg) {
 	UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
 	// Wait send finished.
 	while (!txFinished) {
+
 	}
 
 }
 
+void UART1_putString(uint8_t * dataToSend) {
+}
+
 /****************************************************************************************************************/
 
+void UART0_readEEPROM_task(void * arg) {
+	EventBits_t uartEvents;
 
+	for (;;) {
+		uartEvents = xEventGroupGetBits(g_UART_events);
 
+		if (0x02 && uartEvents) {
+
+			UART0_putString(clear);
+
+			xEventGroupClearBits(g_UART_events, 0x02);
+
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(500));
+
+	}
+
+}
