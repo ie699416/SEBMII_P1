@@ -30,11 +30,11 @@ void systemInit_task(void *arg);
 
 
 /*!
- * @brief UART0 COM with terminal, all possible tasks listed can be created here.
+ * @brief UART0 COM with terminal, main menu is printed here. Also listens for user input character.
  * @param void pointer for input parameters
  */
 
-void PrintSystemMenu_task(void *arg);
+void U0_systemMenu_task(void *arg);
 
 /**********************************************************************************************************************
  * Menu Tasks
@@ -150,6 +150,8 @@ void sEchoLCD_task(void *arg);
 
 
 
+
+
  /**********************************************************************************************************************
   * I2C Tasks
   *********************************************************************************************************************/
@@ -162,6 +164,8 @@ void sEchoLCD_task(void *arg);
   void iReadRTC_task(void * arg);
 
   void Write_EEPROM(void * arg);
+
+  void UART0_readEEPROM_task(void * arg);
 
   void I2C_init();
 
