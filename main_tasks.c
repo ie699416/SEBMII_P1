@@ -28,29 +28,25 @@
 #define I2C_MASTER_CLK I2C0_CLK_SRC
 #define BUFFER_SIZE 2
 
+#define QUEUE_EEPROM_LENGTH 4
+#define QUEUE_RTC_LENGTH 2
 #define QUEUE_LENGTH 3
 #define QUEUE_LENGTH_UART 1
 #define QUEUE_ITEM_SIZE sizeof(uint8_t)
 
-#define EVENT_UART_ESC (1<<0)
-
+#define EVENT_UART_ECHO (1<<0)
 #define EVENT_UART_READ_EEPROM (1<<1)
-
 #define EVENT_UART_WRITE_EEPROM (1<<2)
-
 #define EVENT_UART_SET_HOUR (1<<3)
-
 #define EVENT_UART_SET_DATE (1<<4)
-
 #define EVENT_UART_HOUR_FORMAT (1<<5)
-
 #define EVENT_UART_READ_HOUR (1<<6)
-
 #define EVENT_UART_READ_DATE (1<<7)
-
 #define EVENT_UART_RX (1<<8)
-
 #define EVENT_UART_RESTORE_HANDLE (1<<9)
+#define EVENT_INVALID_CHAR (1<<10)
+#define EVENT_EEPROM_ADDRFULL (1<<11)
+#define EVENT_EEPROM_GET_ADDR  (1<<12)
 
 /****************************************************************************************************************/
 /*	Constant terminal info */
@@ -71,8 +67,9 @@ const uint8_t clear[] = { "\033[2J" };
 
 const uint8_t goTo[] = { "\033[H" };
 
-const uint8_t READ_EEPROM_address[] = {
-		"\n\n\t Introduzca direccion a leer: 0x " };
+const uint8_t READ_EEPROM_address[] =
+		{ "\n\n\t Introduzca direccion a leer: 0x" };
+
 extern const uint8_t ITESO[];
 
 /****************************************************************************************************************/
@@ -80,6 +77,7 @@ extern const uint8_t ITESO[];
 
 SemaphoreHandle_t mutex_TxRx;
 QueueHandle_t g_RTC_mailbox;
+QueueHandle_t g_EEPROM_address;
 QueueHandle_t g_UART_mailbox;
 
 EventGroupHandle_t g_UART_events;
@@ -121,6 +119,54 @@ void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 		rxFinished = true;
 	}
 
+}
+
+/****************************************************************************************************************/
+/*	Local function*/
+
+uint8_t toUpperCase(uint8_t * data) {
+	if (data[0] >= 'a' && data[0] <= 'z') {
+		data[0] -= 'a' - 'A';
+		if (data[0] == 'ñ')
+			data[0] = 'N';
+	}
+
+	return data[0];
+}
+
+void UART0_putString(uint8_t * dataToSend) {
+
+	uart_handle_t g_uartHandle;
+	uart_transfer_t sendXfer;
+	volatile uint8_t index = 0;
+
+	for (index; (dataToSend[index] != '\0'); index++) {
+	}
+
+	uint8_t sendData[index];
+
+	UART_TransferCreateHandle(UART0, &g_uartHandle, UART0_UserCallback,
+	NULL);
+
+	for (index = 0; (dataToSend[index] != '\0'); index++) {
+		sendData[index] = dataToSend[index];
+	}
+
+	// Prepare to send.
+	sendXfer.data = sendData;
+	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
+	txFinished = false;
+	// Send out.
+
+	UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
+	// Wait send finished.
+	while (!txFinished) {
+
+	}
+
+}
+
+void UART1_putString(uint8_t * dataToSend) {
 }
 
 /****************************************************************************************************************/
@@ -191,6 +237,8 @@ void sInitLCD_task(void * arg) {
 	g_UART_events = xEventGroupCreate();
 
 	g_UART_mailbox = xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
+
+	g_EEPROM_address = xQueueCreate(QUEUE_EEPROM_LENGTH, QUEUE_ITEM_SIZE);
 
 	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
 
@@ -495,6 +543,7 @@ void UART0_PrintHello_task(void * arg) {
 	uartEvents = xEventGroupGetBits(g_UART_events);
 
 	xEventGroupSetBits(g_UART_events, EVENT_UART_RX);
+	xEventGroupSetBits(g_UART_events, EVENT_UART_ECHO);
 
 	for (;;) {
 
@@ -519,16 +568,36 @@ void UART0_PrintHello_task(void * arg) {
 
 			xEventGroupSetBits(g_UART_events, EVENT_UART_RX);
 
+			if ((receiveXfer.data[0] >= '0' && receiveXfer.data[0] <= '9')
+					|| (receiveXfer.data[0] >= 'A' && receiveXfer.data[0] <= 'F')
+					|| (receiveXfer.data[0] >= 'a' && receiveXfer.data[0] <= 'f')) {
+
+				xEventGroupSetBits(g_UART_events, EVENT_INVALID_CHAR);
+			} else {
+				xEventGroupClearBits(g_UART_events, EVENT_INVALID_CHAR);
+			}
+
+			receiveXfer.data[0] = toUpperCase(receiveXfer.data);
+
+			if ((EVENT_EEPROM_GET_ADDR == (EVENT_EEPROM_GET_ADDR & uartEvents))) {
+
+				xQueueSendToBack(g_EEPROM_address, receiveXfer.data, 10);
+			}
+
 			xQueueSendToBack(g_UART_mailbox, receiveXfer.data, 10);
+			uartEvents = xEventGroupGetBits(g_UART_events);
 
-			sendXfer0.data = receiveXfer.data;
-			sendXfer0.dataSize = sizeof(echo) / sizeof(echo[0]);
-			txFinished = false;
+			if (EVENT_UART_ECHO == (EVENT_UART_ECHO & uartEvents)) {
 
-			UART_TransferSendNonBlocking(UART0, &g_uart0Handle, &sendXfer0);
-			// Wait send finished.
-			while (!txFinished) {
+				sendXfer0.data = receiveXfer.data;
+				sendXfer0.dataSize = sizeof(echo) / sizeof(echo[0]);
+				txFinished = false;
 
+				UART_TransferSendNonBlocking(UART0, &g_uart0Handle, &sendXfer0);
+				// Wait send finished.
+				while (!txFinished) {
+
+				}
 			}
 		}
 
@@ -542,49 +611,16 @@ void UART0_PrintHello_task(void * arg) {
 
 	}
 }
-/****************************************************************************************************************/
-/*	Local function*/
-
-void UART0_putString(uint8_t * dataToSend) {
-
-	uart_handle_t g_uartHandle;
-	uart_transfer_t sendXfer;
-	volatile uint8_t index = 0;
-
-	for (index; (dataToSend[index] != '\0'); index++) {
-	}
-
-	uint8_t sendData[index];
-
-	UART_TransferCreateHandle(UART0, &g_uartHandle, UART0_UserCallback,
-	NULL);
-
-	for (index = 0; (dataToSend[index] != '\0'); index++) {
-		sendData[index] = dataToSend[index];
-	}
-
-	// Prepare to send.
-	sendXfer.data = sendData;
-	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
-	txFinished = false;
-	// Send out.
-
-	UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
-	// Wait send finished.
-	while (!txFinished) {
-
-	}
-
-}
-
-void UART1_putString(uint8_t * dataToSend) {
-}
 
 /****************************************************************************************************************/
 /*	Menu functions*/
 
 void UART0_readEEPROM_task(void * arg) {
 	EventBits_t uartEvents;
+	uint8_t buffer[QUEUE_EEPROM_LENGTH];
+	uint8_t addrCharLength = 0;
+
+	xEventGroupSetBits(g_UART_events, EVENT_EEPROM_ADDRFULL);
 
 	for (;;) {
 		uartEvents = xEventGroupGetBits(g_UART_events);
@@ -598,8 +634,30 @@ void UART0_readEEPROM_task(void * arg) {
 
 			xEventGroupSetBits(g_UART_events, EVENT_UART_RESTORE_HANDLE);
 
-			vTaskDelete(NULL);
+			xEventGroupSetBits(g_UART_events, EVENT_EEPROM_GET_ADDR);
 
+		}
+
+		uartEvents = xEventGroupGetBits(g_UART_events);
+
+		if ((EVENT_EEPROM_ADDRFULL == (EVENT_EEPROM_ADDRFULL & uartEvents))) {
+
+			if ((EVENT_EEPROM_GET_ADDR == (EVENT_EEPROM_GET_ADDR & uartEvents))) {
+
+				if ( xQueueReceive(g_EEPROM_address, &buffer[addrCharLength],
+						portMAX_DELAY) == pdPASS) {
+					addrCharLength++;
+					if (QUEUE_EEPROM_LENGTH <= addrCharLength) {
+						xEventGroupClearBits(g_UART_events,
+						EVENT_EEPROM_GET_ADDR);
+
+						xEventGroupClearBits(g_UART_events,
+						EVENT_EEPROM_ADDRFULL);
+
+					}
+				}
+
+			}
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));
