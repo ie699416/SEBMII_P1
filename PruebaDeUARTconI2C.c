@@ -71,8 +71,7 @@ void UART1_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 
 	}
 }
-void UART_putString(uint8_t * dataToSend ) {
-
+void UART_putString(uint8_t * dataToSend) {
 
 	uart_handle_t g_uartHandle;
 	uart_transfer_t sendXfer;
@@ -153,24 +152,24 @@ void Read_EEPROM(void * arg) {
 	I2C_MasterGetDefaultConfig(&masterConfig);
 	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
 
-			i2c_master_handle_t g_m_handle;
-			I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
-					i2c_master_callback, NULL);
+	i2c_master_handle_t g_m_handle;
+	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
+			i2c_master_callback, NULL);
 
-			i2c_master_transfer_t masterXfer;
+	i2c_master_transfer_t masterXfer;
 
 	//	    uint8_t read_buffer;
-		    uint8_t read_buffer[7];
-			masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
-			masterXfer.direction = kI2C_Read;
-			masterXfer.subaddress = 0x0000;
-			masterXfer.subaddressSize = 2;
-			masterXfer.data = read_buffer;
-			masterXfer.dataSize = 7;
-			masterXfer.flags = kI2C_TransferDefaultFlag;
+	uint8_t read_buffer[7];
+	masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
+	masterXfer.direction = kI2C_Read;
+	masterXfer.subaddress = 0x0000;
+	masterXfer.subaddressSize = 2;
+	masterXfer.data = read_buffer;
+	masterXfer.dataSize = 7;
+	masterXfer.flags = kI2C_TransferDefaultFlag;
 
-			I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
-			vTaskDelay(pdMS_TO_TICKS(500));
+	I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
+	vTaskDelay(pdMS_TO_TICKS(500));
 
 
 //	uint8_t sendData[];
@@ -178,16 +177,17 @@ void Read_EEPROM(void * arg) {
 	for (;;) {
 
 		I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
-		while (!g_MasterCompletionFlag) {
-				}
-		g_MasterCompletionFlag = false;
+			while (!g_MasterCompletionFlag) {
+			}
+			g_MasterCompletionFlag = false;
+			UART_putString(read_buffer);
 
 //		sendData[0] = ((read_buffer & 0xF0) >> 4) + '0';
 //		sendData[1] = (read_buffer & 0x0F) + '0';
 //		sendData[2] = '\0';
 
-		//UART_putString("\r");
-		UART_putString(read_buffer);
+//UART_putString("\r");
+
 		vTaskDelay(pdMS_TO_TICKS(1000));
 
 	}
@@ -209,13 +209,10 @@ void Write_EEPROM(void * arg) {
 	I2C_MasterGetDefaultConfig(&masterConfig);
 	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
 
-
 	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
 			i2c_master_callback, NULL);
 
-
-
-	uint8_t data_buff[] ={"culito"} ;
+	uint8_t data_buff[] = { "culito" };
 
 	//Init I2C master.
 	masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
@@ -231,8 +228,11 @@ void Write_EEPROM(void * arg) {
 	//Wait for transfer completed.
 	while (!g_MasterCompletionFlag) {
 	}
+	g_MasterCompletionFlag = false;
+
 
 	for (;;) {
+
 
 		vTaskDelay(pdMS_TO_TICKS(100));
 
@@ -252,8 +252,9 @@ int main(void) {
 
 	xTaskCreate(UART1_init_task, "UART1_init", 200, NULL, configMAX_PRIORITIES,
 	NULL);
-//	xTaskCreate(Write_EEPROM, "Write_EEPROM", 200, NULL,configMAX_PRIORITIES - 1,
-//	NULL);
+	xTaskCreate(Write_EEPROM, "Write_EEPROM", 200, NULL,
+			configMAX_PRIORITIES - 1,
+			NULL);
 	xTaskCreate(Read_EEPROM, "Read_EEPROM", 200, NULL, configMAX_PRIORITIES - 2,
 	NULL);
 
