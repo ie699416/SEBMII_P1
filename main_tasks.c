@@ -29,7 +29,6 @@
 #define BUFFER_SIZE 2
 
 #define QUEUE_EEPROM_LENGTH 4
-#define QUEUE_RTC_LENGTH 2
 #define QUEUE_LENGTH 3
 #define QUEUE_LENGTH_UART 1
 #define QUEUE_ITEM_SIZE sizeof(uint8_t)
@@ -57,6 +56,7 @@
 #define EVENT_UART_RX (1<<8)
 #define EVENT_UART_RESTORE_HANDLE (1<<9)
 #define EVENT_INVALID_CHAR (1<<10)
+#define EVENT_CHAR_SENT (1<<11)
 /****************************************************************************************************************/
 /*	Constant terminal info */
 
@@ -213,9 +213,14 @@ void UART1_putString(uint8_t * dataToSend) {
 void U0_systemMenu_task(void *arg) {
 
 	uint8_t xCharReceived;
+	EventBits_t uart_events;
 	UART0_putString(menu);
 
 	for (;;) {
+
+		uart_events = xEventGroupWaitBits(g_UART_events, EVENT_CHAR_SENT,
+				pdTRUE,
+				pdFALSE, portMAX_DELAY);
 
 		if ( xQueueReceive(g_UART_mailbox, &xCharReceived,
 				portMAX_DELAY) == pdPASS) {
@@ -283,13 +288,13 @@ void sInitLCD_task(void * arg) {
 	xTaskCreate(UART1_init_task, "UART1_init", 200, NULL,
 	configMAX_PRIORITIES, NULL);
 
-	xTaskCreate(Write_EEPROM, "Write_EEPROM", 200, NULL,
-	configMAX_PRIORITIES, NULL);
-
 	xTaskCreate(UART0_init_task, "UART0 init", 200, NULL,
 	configMAX_PRIORITIES, NULL);
 
-	xTaskCreate(U0_systemMenu_task, "UART0 menu ", 200, NULL,
+	xTaskCreate(Write_EEPROM, "Write_EEPROM", 200, NULL,
+	configMAX_PRIORITIES, NULL);
+
+	xTaskCreate(sClockLCD_task, "LCD Nokia Print", 200, NULL,
 	configMAX_PRIORITIES, NULL);
 
 	xTaskCreate(iReadRTC_task, "Read RTC seconds", 200, NULL,
@@ -298,14 +303,14 @@ void sInitLCD_task(void * arg) {
 	xTaskCreate(Read_EEPROM, "Read_EEPROM", 200, NULL,
 	configMAX_PRIORITIES - 1, NULL);
 
+	xTaskCreate(U0_systemMenu_task, "UART0 menu ", 200, NULL,
+	configMAX_PRIORITIES - 2, NULL);
+
 	xTaskCreate(UART0_readEEPROM_task, "UART0 menu 1 ", 200, NULL,
 	configMAX_PRIORITIES - 3, NULL);
 
-	xTaskCreate(sClockLCD_task, "LCD Nokia Print", 200, NULL,
-	configMAX_PRIORITIES - 4, NULL);
-
 	xTaskCreate(UART0_PrintHello_task, "Hello0", 200, NULL,
-	configMAX_PRIORITIES - 5, NULL);
+	configMAX_PRIORITIES - 4, NULL);
 
 	vTaskDelete(NULL);
 }
@@ -712,6 +717,7 @@ void UART0_PrintHello_task(void * arg) {
 			}
 
 			xQueueSendToBack(g_UART_mailbox, receiveXfer.data, 10);
+			xEventGroupSetBits(g_UART_events, EVENT_CHAR_SENT);
 			uartEvents = xEventGroupGetBits(g_UART_events);
 
 			if (EVENT_UART_ECHO == (EVENT_UART_ECHO & uartEvents)) {
