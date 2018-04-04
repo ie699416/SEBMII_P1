@@ -16,7 +16,7 @@
  * @brief This task initialize all drivers configurations
  * 	- SPI
  * 	- UART0 & UART1
- * 	- I2C
+ * 	- I2Cl
  * 	- RTC
  * 	- MEM
  *
@@ -28,7 +28,6 @@
 
 void systemInit_task(void *arg);
 
-
 /*!
  * @brief UART0 COM with terminal, main menu is printed here. Also listens for user input character.
  * @param void pointer for input parameters
@@ -39,7 +38,6 @@ void U0_systemMenu_task(void *arg);
 /**********************************************************************************************************************
  * Menu Tasks
  *********************************************************************************************************************/
-
 
 /*!
  * @brief UART0 COM with terminal, all possible tasks listed can be created here.
@@ -106,8 +104,6 @@ void sInitLCD_task(void *arg);
  * @param void pointer for input parameters
  */
 
-
-
 void sEchoLCD_task(void *arg);
 
 /*!
@@ -115,65 +111,55 @@ void sEchoLCD_task(void *arg);
  * @param void pointer for input parameters
  */
 
- void sClockLCD_task(void *arg);
+void sClockLCD_task(void *arg);
 
 /**********************************************************************************************************************
  * UART Tasks
  *********************************************************************************************************************/
 
- /*!
-  * @brief Each second the LCD refresh the hour displayed.
-  * @param void pointer for input parameters
-  */
+/*!
+ * @brief Each second the LCD refresh the hour displayed.
+ * @param void pointer for input parameters
+ */
 
- void UART1_init_task(void * arg);
- /*!
-  * @brief Each second the LCD refresh the hour displayed.
-  * @param void pointer for input parameters
-  */
+void UART1_init_task(void * arg);
+/*!
+ * @brief Each second the LCD refresh the hour displayed.
+ * @param void pointer for input parameters
+ */
 
- void UART0_init_task(void * arg);
+void UART0_init_task(void * arg);
 
- /*!
-  * @brief Each second the LCD refresh the hour displayed.
-  * @param void pointer for input parameters
-  */
+/*!
+ * @brief Each second the LCD refresh the hour displayed.
+ * @param void pointer for input parameters
+ */
 
- void UART1_PrintHello_task(void * arg);
- /*!
-  * @brief Each second the LCD refresh the hour displayed.
-  * @param void pointer for input parameters
-  */
+void UART1_PrintHello_task(void * arg);
+/*!
+ * @brief Each second the LCD refresh the hour displayed.
+ * @param void pointer for input parameters
+ */
 
- void UART0_PrintHello_task(void * arg);
+void UART0_PrintHello_task(void * arg);
 
+/**********************************************************************************************************************
+ * I2C Tasks
+ *********************************************************************************************************************/
 
+/*!
+ * @brief Each second the LCD refresh the hour displayed.
+ * @param void pointer for input parameters
+ */
 
+void iReadRTC_task(void * arg);
 
+void Write_EEPROM(void * arg);
 
+void Read_EEPROM(void * arg);
 
- /**********************************************************************************************************************
-  * I2C Tasks
-  *********************************************************************************************************************/
+void UART0_readEEPROM_task(void * arg);
 
-  /*!
-   * @brief Each second the LCD refresh the hour displayed.
-   * @param void pointer for input parameters
-   */
-
-  void iReadRTC_task(void * arg);
-
-  void Write_EEPROM(void * arg);
-
-  void UART0_readEEPROM_task(void * arg);
-
-  void I2C_init();
-
-
-
-
-
-
-
+void I2C_init();
 
 #endif /* MAIN_TASKS_H_ */
