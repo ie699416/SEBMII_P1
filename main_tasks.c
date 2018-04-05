@@ -38,13 +38,6 @@
 
 /* READ EEPROM STATE MACHINE*/
 
-#define EVENT_EEPROM_READ (1<<1)
-#define EVENT_EEPROM_GET_ADDR  (1<<12)
-#define EVENT_EEPROM_ADDR_FULL (1<<11)
-#define EVENT_EEPROM_GET_LENGTH (1<<11)
-#define EVENT_EEPROM_START_I2C_READ (1<<11)
-#define EVENT_EEPROM_WAIT (1<<11)
-
 #define EVENT_UART_ECHO (1<<0)
 #define EVENT_UART_READ_EEPROM (1<<1)
 #define EVENT_UART_WRITE_EEPROM (1<<2)
@@ -57,6 +50,13 @@
 #define EVENT_UART_RESTORE_HANDLE (1<<9)
 #define EVENT_INVALID_CHAR (1<<10)
 #define EVENT_CHAR_SENT (1<<11)
+
+#define EVENT_EEPROM_READ (1<<12)
+#define EVENT_EEPROM_GET_ADDR  (1<<13)
+#define EVENT_EEPROM_ADDR_FULL (1<<14)
+#define EVENT_EEPROM_GET_LENGTH (1<<15)
+#define EVENT_EEPROM_START_I2C_READ (1<<16)
+#define EVENT_EEPROM_WAIT (1<<17)
 /****************************************************************************************************************/
 /*	Constant terminal info */
 
@@ -77,7 +77,9 @@ const uint8_t clear[] = { "\033[2J" };
 const uint8_t goTo[] = { "\033[H" };
 
 const uint8_t READ_EEPROM_address[] =
-		{ "\n\n\t Introduzca direccion a leer: 0x" };
+		{ "\r\n\t Introduzca direccion a leer: 0x" };
+
+const uint8_t address_length[] = { "\r\n\t Introduzca bytes a leer: " };
 
 extern const uint8_t ITESO[];
 
@@ -213,34 +215,26 @@ void UART1_putString(uint8_t * dataToSend) {
 void U0_systemMenu_task(void *arg) {
 
 	uint8_t xCharReceived;
-	EventBits_t uart_events;
 	UART0_putString(menu);
 
-	for (;;) {
+	xEventGroupWaitBits(g_UART_events, EVENT_CHAR_SENT,
+	pdTRUE, pdFALSE, portMAX_DELAY);
 
-		uart_events = xEventGroupWaitBits(g_UART_events, EVENT_CHAR_SENT,
-				pdTRUE,
-				pdFALSE, portMAX_DELAY);
-
-		if ( xQueueReceive(g_UART_mailbox, &xCharReceived,
-				portMAX_DELAY) == pdPASS) {
-			switch (xCharReceived) {
-			case '1':
-				xEventGroupSetBits(g_UART_events, EVENT_UART_READ_EEPROM);
-				break;
-			case '2':
-				vTaskDelay(pdMS_TO_TICKS(500));
-				UART0_putString(clear);
-				break;
-			default:
-				break;
-			}
-
+	if ( xQueueReceive(g_UART_mailbox, &xCharReceived,
+			portMAX_DELAY) == pdPASS) {
+		switch (xCharReceived) {
+		case '1':
+			xEventGroupSetBits(g_UART_events, EVENT_UART_READ_EEPROM);
+			break;
+		case '2':
+			break;
+		default:
+			break;
 		}
 
-		vTaskDelay(pdMS_TO_TICKS(500));
-
 	}
+
+	vTaskDelete(NULL);
 
 }
 
@@ -734,7 +728,6 @@ void UART0_PrintHello_task(void * arg) {
 			}
 		}
 
-		//io ize exta parte edsom
 		if (EVENT_UART_RX == (EVENT_UART_RX & uartEvents)) {
 			xEventGroupClearBits(g_UART_events, EVENT_UART_RX);
 
@@ -754,7 +747,8 @@ void UART0_readEEPROM_task(void * arg) {
 	uint8_t buffer[QUEUE_EEPROM_LENGTH];
 	uint8_t addrCharLength = 0;
 
-	xEventGroupSetBits(g_UART_events, EVENT_EEPROM_ADDR_FULL);
+	xEventGroupClearBits(g_UART_events,
+	EVENT_EEPROM_ADDR_FULL);
 
 	for (;;) {
 		uartEvents = xEventGroupGetBits(g_UART_events);
@@ -774,24 +768,30 @@ void UART0_readEEPROM_task(void * arg) {
 
 		uartEvents = xEventGroupGetBits(g_UART_events);
 
-		if ((EVENT_EEPROM_ADDR_FULL == (EVENT_EEPROM_ADDR_FULL & uartEvents))) {
+		if ((EVENT_EEPROM_GET_ADDR == (EVENT_EEPROM_GET_ADDR & uartEvents))) {
 
-			if ((EVENT_EEPROM_GET_ADDR == (EVENT_EEPROM_GET_ADDR & uartEvents))) {
+			if ( xQueueReceive(g_EEPROM_address, &buffer[addrCharLength],
+					portMAX_DELAY) == pdPASS) {
+				addrCharLength++;
+				if (QUEUE_EEPROM_LENGTH == addrCharLength) {
+					xEventGroupClearBits(g_UART_events,
+					EVENT_EEPROM_GET_ADDR);
 
-				if ( xQueueReceive(g_EEPROM_address, &buffer[addrCharLength],
-						portMAX_DELAY) == pdPASS) {
-					addrCharLength++;
-					if (QUEUE_EEPROM_LENGTH <= addrCharLength) {
-						xEventGroupClearBits(g_UART_events,
-						EVENT_EEPROM_GET_ADDR);
+					xEventGroupSetBits(g_UART_events,
+					EVENT_EEPROM_ADDR_FULL);
 
-						xEventGroupClearBits(g_UART_events,
-						EVENT_EEPROM_ADDR_FULL);
-
-					}
 				}
-
 			}
+
+		}
+
+		if ((EVENT_EEPROM_ADDR_FULL == (EVENT_EEPROM_ADDR_FULL & uartEvents))) {
+			xEventGroupClearBits(g_UART_events,
+			EVENT_EEPROM_ADDR_FULL);
+			UART0_putString(address_length);
+
+
+			xEventGroupSetBits(g_UART_events, EVENT_UART_RESTORE_HANDLE);
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));
