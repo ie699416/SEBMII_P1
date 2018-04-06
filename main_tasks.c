@@ -91,6 +91,11 @@ QueueHandle_t g_RTC_mailbox;
 QueueHandle_t g_EEPROM_address;
 QueueHandle_t g_UART_mailbox;
 
+uart_handle_t g_uart0Handle;
+uart_handle_t g_uart1Handle;
+
+i2c_master_handle_t g_I2C_handle;
+
 EventGroupHandle_t g_UART_events;
 
 volatile bool g_MasterCompletionFlag = false;
@@ -147,7 +152,6 @@ uint8_t toUpperCase(uint8_t * data) {
 
 void UART0_putString(uint8_t * dataToSend) {
 
-	uart_handle_t g_uartHandle;
 	uart_transfer_t sendXfer;
 	volatile uint8_t index = 0;
 
@@ -155,9 +159,6 @@ void UART0_putString(uint8_t * dataToSend) {
 	}
 
 	uint8_t sendData[index];
-
-	UART_TransferCreateHandle(UART0, &g_uartHandle, UART0_UserCallback,
-	NULL);
 
 	for (index = 0; (dataToSend[index] != '\0'); index++) {
 		sendData[index] = dataToSend[index];
@@ -169,7 +170,7 @@ void UART0_putString(uint8_t * dataToSend) {
 	txFinished = false;
 	// Send out.
 
-	UART_TransferSendNonBlocking(UART0, &g_uartHandle, &sendXfer);
+	UART_TransferSendNonBlocking(UART0, &g_uart0Handle, &sendXfer);
 	// Wait send finished.
 	while (!txFinished) {
 
@@ -179,7 +180,6 @@ void UART0_putString(uint8_t * dataToSend) {
 
 void UART1_putString(uint8_t * dataToSend) {
 
-	uart_handle_t g_uartHandle;
 	uart_transfer_t sendXfer;
 	uint8_t index = 0;
 
@@ -188,9 +188,6 @@ void UART1_putString(uint8_t * dataToSend) {
 	}
 
 	uint8_t sendData[index];
-
-	UART_TransferCreateHandle(UART1, &g_uartHandle, UART1_UserCallback,
-	NULL);
 
 	for (index = 0; (dataToSend[index] != '\0'); index++) {
 		sendData[index] = dataToSend[index];
@@ -202,7 +199,7 @@ void UART1_putString(uint8_t * dataToSend) {
 	txFinished = false;
 	// Send out.
 
-	UART_TransferSendNonBlocking(UART1, &g_uartHandle, &sendXfer);
+	UART_TransferSendNonBlocking(UART1, &g_uart1Handle, &sendXfer);
 	// Wait send finished.
 	while (!txFinished) {
 	}
@@ -244,16 +241,17 @@ void U0_systemMenu_task(void *arg) {
 void I2C_init() {
 
 	CLOCK_EnableClock(kCLOCK_I2c0);
-	CLOCK_EnableClock(kCLOCK_PortB);
+	CLOCK_EnableClock(kCLOCK_PortE);
 
 	port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
 			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
-			kPORT_LowDriveStrength, kPORT_MuxAlt2, kPORT_UnlockRegister, };
+			kPORT_LowDriveStrength, kPORT_MuxAlt5, kPORT_UnlockRegister, };
 
-	PORT_SetPinConfig(PORTB, 2, &config_i2c);
-	PORT_SetPinConfig(PORTB, 3, &config_i2c);
+	PORT_SetPinConfig(PORTE, 24, &config_i2c);
+	PORT_SetPinConfig(PORTE, 25, &config_i2c);
 
 	i2c_master_config_t masterConfig;
+
 	I2C_MasterGetDefaultConfig(&masterConfig);
 	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
 	vTaskDelete(NULL);
@@ -278,6 +276,9 @@ void sInitLCD_task(void * arg) {
 	g_EEPROM_address = xQueueCreate(QUEUE_EEPROM_LENGTH, QUEUE_ITEM_SIZE);
 
 	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
+
+	xTaskCreate(I2C_init, "I2C_init", 200, NULL,
+	configMAX_PRIORITIES, NULL);
 
 	xTaskCreate(UART1_init_task, "UART1_init", 200, NULL,
 	configMAX_PRIORITIES, NULL);
@@ -327,6 +328,9 @@ void UART1_init_task(void * arg) {
 	user_config.enableTx = true;
 	user_config.enableRx = true;
 
+	UART_TransferCreateHandle(UART1, &g_uart1Handle, UART1_UserCallback,
+	NULL);
+
 	UART_Init(UART1, &user_config, CLOCK_GetFreq(UART1_CLK_SRC));
 	vTaskDelete(NULL);
 
@@ -341,6 +345,9 @@ void UART0_init_task(void * arg) {
 	user_config.enableTx = true;
 	user_config.enableRx = true;
 
+	UART_TransferCreateHandle(UART0, &g_uart0Handle, UART0_UserCallback,
+	NULL);
+
 	UART_Init(UART0, &user_config, CLOCK_GetFreq(UART0_CLK_SRC));
 	vTaskDelete(NULL);
 
@@ -350,21 +357,6 @@ void UART0_init_task(void * arg) {
 /*	EEPROM Tasks*/
 
 void Read_EEPROM(void * arg) {
-
-	CLOCK_EnableClock(kCLOCK_I2c0);
-	CLOCK_EnableClock(kCLOCK_PortE);
-
-	port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
-			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
-			kPORT_LowDriveStrength, kPORT_MuxAlt5, kPORT_UnlockRegister, };
-
-	PORT_SetPinConfig(PORTE, 24, &config_i2c);
-	PORT_SetPinConfig(PORTE, 25, &config_i2c);
-
-	i2c_master_config_t masterConfig;
-	I2C_MasterGetDefaultConfig(&masterConfig);
-	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
-
 	i2c_master_handle_t g_m_handle;
 	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
 			i2c_master_callback, NULL);
@@ -411,25 +403,12 @@ void Read_EEPROM(void * arg) {
 }
 
 void Write_EEPROM(void * arg) {
-	CLOCK_EnableClock(kCLOCK_I2c0);
-	CLOCK_EnableClock(kCLOCK_PortE);
 
-	port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
-			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
-			kPORT_LowDriveStrength, kPORT_MuxAlt5, kPORT_UnlockRegister, };
-
-	PORT_SetPinConfig(PORTE, 24, &config_i2c);
-	PORT_SetPinConfig(PORTE, 25, &config_i2c);
-
-	i2c_master_config_t masterConfig;
-	i2c_master_transfer_t masterXfer;
 	i2c_master_handle_t g_m_handle;
-
-	I2C_MasterGetDefaultConfig(&masterConfig);
-	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
-
 	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
 			i2c_master_callback, NULL);
+
+	i2c_master_transfer_t masterXfer;
 
 	uint8_t data_buff[] = { "hola\n\r" };
 
@@ -461,21 +440,9 @@ void Write_EEPROM(void * arg) {
 
 void iReadRTC_task(void * arg) {
 
-	CLOCK_EnableClock(kCLOCK_I2c0);
-	CLOCK_EnableClock(kCLOCK_PortE);
-
-	port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
-			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
-			kPORT_LowDriveStrength, kPORT_MuxAlt5, kPORT_UnlockRegister, };
-
-	PORT_SetPinConfig(PORTE, 24, &config_i2c);
-	PORT_SetPinConfig(PORTE, 25, &config_i2c);
-
-	i2c_master_config_t masterConfig;
-	I2C_MasterGetDefaultConfig(&masterConfig);
-	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
-
 	i2c_master_handle_t g_m_handle;
+	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
+			i2c_master_callback, NULL);
 
 	i2c_master_transfer_t masterXfer;
 	uint8_t data_buff = 0x11;
@@ -505,6 +472,7 @@ void iReadRTC_task(void * arg) {
 		I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
 				i2c_master_callback, NULL);
 		I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
+
 		while (!g_MasterCompletionFlag) {
 		}
 		g_MasterCompletionFlag = false;
@@ -515,8 +483,7 @@ void iReadRTC_task(void * arg) {
 		masterXfer.subaddress = 0x03;
 
 		xSemaphoreTake(mutex_TxRx, portMAX_DELAY);
-		I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
-				i2c_master_callback, NULL);
+
 		I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
 		while (!g_MasterCompletionFlag) {
 		}
@@ -528,8 +495,7 @@ void iReadRTC_task(void * arg) {
 		masterXfer.subaddress = 0x02;
 
 		xSemaphoreTake(mutex_TxRx, portMAX_DELAY);
-		I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
-				i2c_master_callback, NULL);
+
 		I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
 		while (!g_MasterCompletionFlag) {
 		}
@@ -610,25 +576,12 @@ void UART1_PrintHello_task(void * arg) {
 
 	CLOCK_EnableClock(kCLOCK_Uart1);
 	void *userData;
-	uart_handle_t g_uartHandle;
 	uart_config_t user_config;
 	uart_transfer_t sendXfer;
 	uart_transfer_t receiveXfer;
 
 	uint8_t sendData[] = { 'H', 'e', 'l', 'l', 'o' };
 	uint8_t receiveData[32];
-
-//...
-	UART_GetDefaultConfig(&user_config);
-	user_config.baudRate_Bps = 9600;
-	user_config.enableTx = true;
-	user_config.enableRx = true;
-//	UART_Init(UART0, &user_config, CLOCK_GetFreq(UART0_CLK_SRC));
-//	UART_TransferCreateHandle(UART0, &g_uartHandle, UART_UserCallback,
-//			userData);
-	UART_Init(UART1, &user_config, CLOCK_GetFreq(UART1_CLK_SRC));
-	UART_TransferCreateHandle(UART1, &g_uartHandle, UART1_UserCallback,
-			userData);
 
 // Prepare to send.
 	sendXfer.data = sendData;
@@ -637,7 +590,7 @@ void UART1_PrintHello_task(void * arg) {
 // Send out.
 
 	for (;;) {
-		UART_TransferSendNonBlocking(UART1, &g_uartHandle, &sendXfer);
+		UART_TransferSendNonBlocking(UART1, &g_uart1Handle, &sendXfer);
 
 		// Wait send finished.
 		while (!txFinished) {
@@ -661,10 +614,7 @@ void UART0_PrintHello_task(void * arg) {
 
 	//...
 
-	uart_handle_t g_uart0Handle;
 	uart_transfer_t sendXfer0;
-	UART_TransferCreateHandle(UART0, &g_uart0Handle, UART0_UserCallback,
-	NULL);
 
 	uartEvents = xEventGroupGetBits(g_UART_events);
 
@@ -789,7 +739,6 @@ void UART0_readEEPROM_task(void * arg) {
 			xEventGroupClearBits(g_UART_events,
 			EVENT_EEPROM_ADDR_FULL);
 			UART0_putString(address_length);
-
 
 			xEventGroupSetBits(g_UART_events, EVENT_UART_RESTORE_HANDLE);
 		}
