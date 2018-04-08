@@ -35,6 +35,14 @@ void systemInit_task(void *arg);
 
 void U0_systemMenu_task(void *arg);
 
+/*!
+ * @brief UART0 COM with terminal, main menu is printed here. Also listens for user input character.
+ * @param void pointer for input parameters
+ */
+
+void U1_systemMenu_task(void *arg);
+
+
 /**********************************************************************************************************************
  * Menu Tasks
  *********************************************************************************************************************/
@@ -135,13 +143,21 @@ void UART0_init_task(void * arg);
  * @param void pointer for input parameters
  */
 
-void UART1_PrintHello_task(void * arg);
+void UART1_PrintEcho_task(void * arg);
+
 /*!
  * @brief Each second the LCD refresh the hour displayed.
  * @param void pointer for input parameters
  */
 
-void UART0_PrintHello_task(void * arg);
+void UART1_PrintHello_task(void * arg);
+
+/*!
+ * @brief Each second the LCD refresh the hour displayed.
+ * @param void pointer for input parameters
+ */
+
+void UART0_PrintEcho_task(void * arg);
 
 /**********************************************************************************************************************
  * I2C Tasks
@@ -159,6 +175,8 @@ void Write_EEPROM(void * arg);
 void Read_EEPROM(void * arg);
 
 void UART0_readEEPROM_task(void * arg);
+
+void UART1_readEEPROM_task(void * arg);
 
 void I2C_init();
 
