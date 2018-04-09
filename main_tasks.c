@@ -710,25 +710,13 @@ void UART0_PrintEcho_task(void * arg) {
 
 			xEventGroupSetBits(g_TERM0_events, EVENT_UART_RX);
 
-			if (ESCAPE_KEY != receiveXfer.data[0]) {
-				if ((receiveXfer.data[0] >= '0' && receiveXfer.data[0] <= '9')
-
-				|| (receiveXfer.data[0] >= 'A' && receiveXfer.data[0] <= 'F')
-						|| (receiveXfer.data[0] >= 'a'
-								&& receiveXfer.data[0] <= 'f')) {
-
-					xEventGroupSetBits(g_TERM0_events, EVENT_INVALID_CHAR);
-				} else {
-					xEventGroupClearBits(g_TERM0_events, EVENT_INVALID_CHAR);
-				}
-			} else {
+			if (ESCAPE_KEY == receiveXfer.data[0]) {
 				xEventGroupSetBits(g_TERM0_events, EVENT_MENU_WAIT);
 			}
 
 			receiveXfer.data[0] = toUpperCase(receiveXfer.data);
 
 			if (EVENT_EEPROM_GET_ADDR & xEventGroupGetBits(g_TERM0_events)) {
-				receiveXfer.data = receiveXfer.data - '0';
 
 				xQueueSendToBack(g_TERM0_EEPROM_address, receiveXfer.data, 10);
 			}
@@ -864,16 +852,16 @@ void UART0_readEEPROM_task(void * arg) {
 				if (buffer[addrCharLength] >= '0'
 						&& buffer[addrCharLength] <= '9') {
 					buffer[addrCharLength] -= 48;
-					addrCharLength++;
 				} else if (buffer[addrCharLength] >= 'A'
 						&& buffer[addrCharLength] <= 'F') {
 					buffer[addrCharLength] -= 55;
-					addrCharLength++;
 				} else {
 					xEventGroupSetBits(g_TERM0_events, EVENT_INVALID_CHAR);
-
 				}
+
+				addrCharLength++;
 				if (QUEUE_EEPROM_LENGTH == addrCharLength) {
+					vTaskDelay(pdMS_TO_TICKS(10));
 					addrCharLength = 0;
 
 					if (EVENT_INVALID_CHAR & xEventGroupGetBits(g_TERM0_events)) {
