@@ -728,6 +728,7 @@ void UART0_PrintEcho_task(void * arg) {
 			receiveXfer.data[0] = toUpperCase(receiveXfer.data);
 
 			if (EVENT_EEPROM_GET_ADDR & xEventGroupGetBits(g_TERM0_events)) {
+				receiveXfer.data = receiveXfer.data - '0';
 
 				xQueueSendToBack(g_TERM0_EEPROM_address, receiveXfer.data, 10);
 			}
@@ -859,12 +860,36 @@ void UART0_readEEPROM_task(void * arg) {
 
 			if ( xQueueReceive(g_TERM0_EEPROM_address, &buffer[addrCharLength],
 					portMAX_DELAY) == pdPASS) {
-				addrCharLength++;
+
+				if (buffer[addrCharLength] >= '0'
+						&& buffer[addrCharLength] <= '9') {
+					buffer[addrCharLength] -= 48;
+					addrCharLength++;
+				} else if (buffer[addrCharLength] >= 'A'
+						&& buffer[addrCharLength] <= 'F') {
+					buffer[addrCharLength] -= 55;
+					addrCharLength++;
+				} else {
+					xEventGroupSetBits(g_TERM0_events, EVENT_INVALID_CHAR);
+
+				}
 				if (QUEUE_EEPROM_LENGTH == addrCharLength) {
 					addrCharLength = 0;
-					xEventGroupClearBits(g_TERM0_events, EVENT_EEPROM_GET_ADDR);
-					xEventGroupSetBits(g_TERM0_events, EVENT_EEPROM_ADDR_FULL);
 
+					if (EVENT_INVALID_CHAR & xEventGroupGetBits(g_TERM0_events)) {
+						xEventGroupClearBits(g_TERM0_events,
+						EVENT_INVALID_CHAR);
+
+						UART0_putString(READ_EEPROM_address);
+
+					} else {
+
+						xEventGroupClearBits(g_TERM0_events,
+						EVENT_EEPROM_GET_ADDR);
+						xEventGroupSetBits(g_TERM0_events,
+						EVENT_EEPROM_ADDR_FULL);
+
+					}
 				}
 			}
 
