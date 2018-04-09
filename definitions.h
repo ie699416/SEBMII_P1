@@ -8,13 +8,21 @@
 #ifndef DEFINITIONS_H_
 #define DEFINITIONS_H_
 
-#include <char_arrays.h>
-#include "main_tasks.h"
+#include "char_arrays.h"
 #include "LCDNokia5110.h"
 #include "fsl_uart.h"
 #include "fsl_i2c.h"
 #include "fsl_debug_console.h"
 #include "MK64F12.h"
+
+#include <stdio.h>
+#include "board.h"
+#include "peripherals.h"
+#include "pin_mux.h"
+#include "clock_config.h"
+#include "fsl_debug_console.h"
+#include "main_tasks.h"
+#include "FreeRTOS.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -73,10 +81,14 @@
 #define EVENT_UART1_TX (1<<2)
 #define EVENT_UART1_RX (1<<3)
 
+#define EVENT_I2C_MASTER_TX_COMPLETE (1<<0)
+
 /****************************************************************************************************************/
 /*	Global variables getters */
 
 uart_handle_t * get_g_uart0Handle();
+
+uart_handle_t * get_g_uart1Handle();
 
 void createEvents();
 
@@ -88,6 +100,7 @@ EventGroupHandle_t get_g_TERM1_events();
 
 EventGroupHandle_t get_g_UART_events();
 
+EventGroupHandle_t get_g_I2C_events();
 
 QueueHandle_t get_g_RTC_mailbox();
 
@@ -98,6 +111,5 @@ QueueHandle_t get_g_TERM1_EEPROM_address();
 QueueHandle_t get_g_UART0_mailbox();
 
 QueueHandle_t get_g_UART1_mailbox();
-
 
 #endif /* DEFINITIONS_H_ */

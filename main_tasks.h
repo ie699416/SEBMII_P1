@@ -124,40 +124,6 @@ void sClockLCD_task(void *arg);
  * UART Tasks
  *********************************************************************************************************************/
 
-/*!
- * @brief Each second the LCD refresh the hour displayed.
- * @param void pointer for input parameters
- */
-
-void UART1_init_task(void * arg);
-/*!
- * @brief Each second the LCD refresh the hour displayed.
- * @param void pointer for input parameters
- */
-
-void UART0_init_task(void * arg);
-
-/*!
- * @brief Each second the LCD refresh the hour displayed.
- * @param void pointer for input parameters
- */
-
-void UART1_PrintEcho_task(void * arg);
-
-/*!
- * @brief Each second the LCD refresh the hour displayed.
- * @param void pointer for input parameters
- */
-
-void UART1_PrintHello_task(void * arg);
-
-/*!
- * @brief Each second the LCD refresh the hour displayed.
- * @param void pointer for input parameters
- */
-
-void UART0_PrintEcho_task(void * arg);
-
 /**********************************************************************************************************************
  * I2C Tasks
  *********************************************************************************************************************/
@@ -173,13 +139,11 @@ void Write_EEPROM(void * arg);
 
 void Read_EEPROM(void * arg);
 
+void UART1_GetChar_task();
+
 void UART0_readEEPROM_task(void * arg);
 
 void UART1_readEEPROM_task(void * arg);
-
-void I2C_init();
-
-void UART1_GetChar_task();
 
 void Chat_Task();
 
