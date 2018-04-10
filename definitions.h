@@ -44,9 +44,11 @@
 #define BUFFER_SIZE 2
 
 #define QUEUE_EEPROM_LENGTH 4
+#define QUEUE_ITEM_SIZE
 #define QUEUE_LENGTH 3
 #define QUEUE_LENGTH_UART 1
 #define QUEUE_ITEM_SIZE sizeof(uint8_t)
+#define QUEUE_EEPROM_ITEM_SIZE sizeof(uint16_t)
 
 /****************************************************************************************************************/
 /*	Event definitions*/
@@ -77,11 +79,14 @@
 #define EVENT_I2C_EEPROM_TX_COMPLETE (1<<1)
 
 #define EVENT_UART0_TX (1<<0)
-#define EVENT_UART0_RX (1<<1)
+#define EVENT_UART0_RX (1<<0)
 #define EVENT_UART1_TX (1<<2)
-#define EVENT_UART1_RX (1<<3)
+#define EVENT_UART1_RX (1<<2)
 
 #define EVENT_I2C_MASTER_TX_COMPLETE (1<<0)
+#define EVENT_I2C_START_ADDRESS_READY (1<<1)
+#define EVENT_I2C_END_ADDRESS_READY (1<<2)
+
 
 /****************************************************************************************************************/
 /*	Global variables getters */
@@ -103,6 +108,8 @@ EventGroupHandle_t get_g_UART_events();
 EventGroupHandle_t get_g_I2C_events();
 
 QueueHandle_t get_g_RTC_mailbox();
+
+QueueHandle_t get_g_EEPROM_mailbox();
 
 QueueHandle_t get_g_TERM0_EEPROM_address();
 

@@ -24,6 +24,8 @@ QueueHandle_t g_UART1_mailbox;
 
 QueueHandle_t g_RTC_mailbox;
 
+QueueHandle_t g_EEPROM_mailbox;
+
 uart_handle_t g_uart0Handle;
 
 uart_handle_t g_uart1Handle;
@@ -49,6 +51,8 @@ void createEvents() {
 
 	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
 
+	g_EEPROM_mailbox = xQueueCreate(QUEUE_EEPROM_LENGTH, QUEUE_EEPROM_ITEM_SIZE);
+
 }
 
 QueueHandle_t get_g_TERM0_EEPROM_address() {
@@ -69,6 +73,10 @@ QueueHandle_t get_g_UART1_mailbox() {
 
 QueueHandle_t get_g_RTC_mailbox() {
 	return g_RTC_mailbox;
+}
+
+QueueHandle_t get_g_EEPROM_mailbox(){
+	return g_EEPROM_mailbox;
 }
 
 

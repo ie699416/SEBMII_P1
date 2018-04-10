@@ -123,19 +123,6 @@ void UART0_PrintEcho_task(void * arg) {
 			xEventGroupSetBits(get_g_TERM0_events(), EVENT_UART_RX);
 
 			if (ESCAPE_KEY != receiveXfer.data[0]) {
-				if ((receiveXfer.data[0] >= '0' && receiveXfer.data[0] <= '9')
-
-				|| (receiveXfer.data[0] >= 'A' && receiveXfer.data[0] <= 'F')
-						|| (receiveXfer.data[0] >= 'a'
-								&& receiveXfer.data[0] <= 'f')) {
-
-					xEventGroupSetBits(get_g_TERM0_events(),
-					EVENT_INVALID_CHAR);
-				} else {
-					xEventGroupClearBits(get_g_TERM0_events(),
-					EVENT_INVALID_CHAR);
-				}
-			} else {
 				xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
 			}
 
@@ -200,19 +187,6 @@ void UART1_PrintEcho_task(void * arg) {
 			xEventGroupSetBits(get_g_TERM1_events(), EVENT_UART_RX);
 
 			if (ESCAPE_KEY != receiveXfer.data[0]) {
-				if ((receiveXfer.data[0] >= '0' && receiveXfer.data[0] <= '9')
-
-				|| (receiveXfer.data[0] >= 'A' && receiveXfer.data[0] <= 'F')
-						|| (receiveXfer.data[0] >= 'a'
-								&& receiveXfer.data[0] <= 'f')) {
-
-					xEventGroupSetBits(get_g_TERM1_events(),
-					EVENT_INVALID_CHAR);
-				} else {
-					xEventGroupClearBits(get_g_TERM1_events(),
-					EVENT_INVALID_CHAR);
-				}
-			} else {
 				xEventGroupSetBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
 			}
 
