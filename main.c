@@ -19,12 +19,12 @@ int main(void) {
 
 	NVIC_EnableIRQ(I2C0_IRQn);
 	NVIC_EnableIRQ(SPI0_IRQn);
-	NVIC_EnableIRQ(UART0_RX_TX_IRQn);
 	NVIC_EnableIRQ(UART1_RX_TX_IRQn);
+	NVIC_EnableIRQ(UART4_RX_TX_IRQn);
 
 	NVIC_SetPriority(I2C0_IRQn, 5);
 	NVIC_SetPriority(SPI0_IRQn, 5);
-	NVIC_SetPriority(UART0_RX_TX_IRQn, 5);
+	NVIC_SetPriority(UART4_RX_TX_IRQn, 5);
 	NVIC_SetPriority(UART1_RX_TX_IRQn, 5);
 
 	vTaskStartScheduler();

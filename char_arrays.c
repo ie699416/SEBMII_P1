@@ -61,6 +61,14 @@ uint8_t menu[] = { "\033[2J\n\r"
 
 uint8_t clearScreen[] = { "\033[2J\033[H" };
 
+const uint8_t comBtwTerm[] = {"Empieza comunicacion entre terminales...\n\r\n" };
+
+const uint8_t jumpLine[] = "\n";
+
+const uint8_t MsgFromTerONE[] = { "Terminal UNO dice:\n\r" };
+
+const uint8_t MsgFromTerTWO[] = { "Terminal DOS dice:\n\r\n" };
+
 /****************************************************************************************************************/
 /*	Getters */
 
@@ -74,5 +82,16 @@ uint8_t * getClearScreen() {
 
 uint8_t * getITESO() {
 	return ITESO;
+}
+
+uint8_t * getComBtwTerm() {
+	return comBtwTerm;
+}
+
+uint8_t * getMsgFromTerONE() {
+	return MsgFromTerONE;
+}
+uint8_t * getJumpLine() {
+	return jumpLine;
 }
 

@@ -44,11 +44,9 @@
 #define BUFFER_SIZE 2
 
 #define QUEUE_EEPROM_LENGTH 4
-#define QUEUE_ITEM_SIZE
 #define QUEUE_LENGTH 3
 #define QUEUE_LENGTH_UART 1
 #define QUEUE_ITEM_SIZE sizeof(uint8_t)
-#define QUEUE_EEPROM_ITEM_SIZE sizeof(uint16_t)
 
 /****************************************************************************************************************/
 /*	Event definitions*/
@@ -56,7 +54,7 @@
 /* READ EEPROM STATE MACHINE*/
 
 #define EVENT_UART_ECHO (1<<0)
-#define EVENT_UART_READ_EEPROM (1<<1)
+#define EVENT_UART_READ_EEPROM (1<<18)
 #define EVENT_UART_WRITE_EEPROM (1<<2)
 #define EVENT_UART_SET_HOUR (1<<3)
 #define EVENT_UART_SET_DATE (1<<4)
@@ -74,19 +72,21 @@
 #define EVENT_EEPROM_GET_LENGTH (1<<15)
 #define EVENT_EEPROM_START_I2C_READ (1<<16)
 #define EVENT_EEPROM_WAIT (1<<17)
+#define EVENT_CHAT_TASK_ON (1 << 1)
 
 #define EVENT_I2C_RTC_TX_COMPLETE (1<<0)
 #define EVENT_I2C_EEPROM_TX_COMPLETE (1<<1)
 
 #define EVENT_UART0_TX (1<<0)
-#define EVENT_UART0_RX (1<<0)
+#define EVENT_UART0_RX (1<<1)
 #define EVENT_UART1_TX (1<<2)
-#define EVENT_UART1_RX (1<<2)
+#define EVENT_UART1_RX (1<<3)
+
+//#define UART_COMPLETE (1<<1) //DONE
+//#define UART1_RX (1<<2)//DONE
+#define UART_CHAT_ENTER_KEY (1<<19)//DONE
 
 #define EVENT_I2C_MASTER_TX_COMPLETE (1<<0)
-#define EVENT_I2C_START_ADDRESS_READY (1<<1)
-#define EVENT_I2C_END_ADDRESS_READY (1<<2)
-
 
 /****************************************************************************************************************/
 /*	Global variables getters */
@@ -109,8 +109,6 @@ EventGroupHandle_t get_g_I2C_events();
 
 QueueHandle_t get_g_RTC_mailbox();
 
-QueueHandle_t get_g_EEPROM_mailbox();
-
 QueueHandle_t get_g_TERM0_EEPROM_address();
 
 QueueHandle_t get_g_TERM1_EEPROM_address();
@@ -118,5 +116,10 @@ QueueHandle_t get_g_TERM1_EEPROM_address();
 QueueHandle_t get_g_UART0_mailbox();
 
 QueueHandle_t get_g_UART1_mailbox();
+
+QueueHandle_t get_g_UART1_Chat_mailbox();
+
+
+
 
 #endif /* DEFINITIONS_H_ */

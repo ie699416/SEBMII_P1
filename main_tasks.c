@@ -65,7 +65,8 @@ void U0_systemMenu_task(void *arg) {
 				xEventGroupSetBits(get_g_TERM0_events(),
 				EVENT_UART_READ_EEPROM);
 				break;
-			case '2':
+			case '8':
+
 				break;
 			default:
 				xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
@@ -100,11 +101,13 @@ void U1_systemMenu_task(void *arg) {
 				UART1_putString(getMenu());
 				xEventGroupSetBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
 				break;
-			case '1':
+			case '8':
 				xEventGroupSetBits(get_g_TERM1_events(),
-				EVENT_UART_READ_EEPROM);
+				EVENT_CHAT_TASK_ON);
+
 				break;
-			case '2':
+			case '1':
+				xEventGroupSetBits(get_g_TERM1_events, EVENT_UART_READ_EEPROM);
 				break;
 			default:
 				xEventGroupSetBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
@@ -167,15 +170,70 @@ void sInitLCD_task(void * arg) {
 	xTaskCreate(UART1_readEEPROM_task, "READ TERM 1 ", 200, NULL,
 	configMAX_PRIORITIES - 3, NULL);
 
+	xTaskCreate(Chat_Task, "TERM 1 Chat_Task", 200, NULL,
+	configMAX_PRIORITIES - 3, NULL);
+
 	xTaskCreate(UART0_PrintEcho_task, "TERM 0 Echo", 200, NULL,
 	configMAX_PRIORITIES - 4, NULL);
 
 	xTaskCreate(UART1_PrintEcho_task, "TERM 1 Echo", 200, NULL,
 	configMAX_PRIORITIES - 4, NULL);
 
+
+
 	vTaskDelete(NULL);
 }
+void Chat_Task(void *arg) {
 
+	xEventGroupWaitBits(get_g_TERM1_events(), EVENT_CHAT_TASK_ON, pdFALSE, pdFALSE,
+	portMAX_DELAY);
+	UART1_putString(getClearScreen());
+	UART1_putString(getComBtwTerm());
+
+	uint8_t chatBffr[2];
+	chatBffr[1] = '\0';
+	uint8_t addrCharLength = 0;
+	uint8_t enterSendBffr[500];
+	uint8_t resetChatBffrIndex;
+	uint8_t entersendBffrIndex = 0;
+	uint8_t index;
+	uint8_t *enterSendBffrRealLength;
+	for (;;) {
+
+
+
+		xQueueReceive(get_g_UART1_Chat_mailbox(), &chatBffr[0], portMAX_DELAY);
+		enterSendBffr[entersendBffrIndex] = chatBffr[0];
+		entersendBffrIndex++;
+
+
+
+		if (chatBffr[0] == ENTER_KEY) {
+			xEventGroupSetBits(get_g_TERM1_events(), UART_CHAT_ENTER_KEY);
+			enterSendBffrRealLength = pvPortMalloc(sizeof (uint8_t)*entersendBffrIndex);
+
+
+			for (index = 0; index <= entersendBffrIndex; index++) {
+				enterSendBffrRealLength[index] = enterSendBffr[index];
+
+			}
+			UART1_putString(getJumpLine());
+			UART1_putString(getMsgFromTerONE());
+			xEventGroupSetBits(get_g_TERM1_events(), UART_CHAT_ENTER_KEY);
+			UART1_putString(enterSendBffrRealLength);
+			UART1_putString(getJumpLine());
+
+			for(resetChatBffrIndex = 0; resetChatBffrIndex < 200;resetChatBffrIndex ++){
+				enterSendBffr[resetChatBffrIndex] = 0x20;
+					}
+			vPortFree(enterSendBffrRealLength);
+			entersendBffrIndex=0;
+
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(100));
+	}
+}
 /****************************************************************************************************************/
 /*	EEPROM Tasks*/
 
@@ -188,37 +246,29 @@ void Read_EEPROM(void * arg) {
 
 	//	    uint8_t read_buffer;
 	uint8_t read_buffer[7];
-	uint16_t start_address;
 	masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
 	masterXfer.direction = kI2C_Read;
 	masterXfer.subaddress = 0x0000;
 	masterXfer.subaddressSize = 2;
-	masterXfer.data = &read_buffer;
+	masterXfer.data = read_buffer;
 	masterXfer.dataSize = 7;
 	masterXfer.flags = kI2C_TransferDefaultFlag;
 
 	I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
 	vTaskDelay(pdMS_TO_TICKS(500));
 
-	xEventGroupWaitBits(get_g_I2C_events(),
-	EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(100));
-
 //	uint8_t sendData[];
 
 	for (;;) {
-		if ( xQueueReceive(get_g_EEPROM_mailbox(), &start_address,
-				portMAX_DELAY) == pdPASS) {
 
-			masterXfer.subaddress = start_address;
-
-			I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
-					i2c_master_callback, NULL);
-			I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
-			xEventGroupWaitBits(get_g_I2C_events(),
-			EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(100));
-			xSemaphoreGive(mutex_TxRx);
-			UART0_putString(read_buffer);
-		}
+		xSemaphoreTake(mutex_TxRx, portMAX_DELAY);
+		I2C_MasterTransferCreateHandle(I2C0_BASEADDR, &g_m_handle,
+				i2c_master_callback, NULL);
+		I2C_MasterTransferNonBlocking(I2C0, &g_m_handle, &masterXfer);
+		xEventGroupWaitBits(get_g_I2C_events(),
+		EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(100));
+		xSemaphoreGive(mutex_TxRx);
+//		UART1_putString(read_buffer);
 
 //		sendData[0] = ((read_buffer & 0xF0) >> 4) + '0';
 //		sendData[1] = (read_buffer & 0x0F) + '0';
@@ -240,23 +290,22 @@ void Write_EEPROM(void * arg) {
 
 	i2c_master_transfer_t masterXfer;
 
-	uint8_t data_buff[] = { "puto" };
-	uint8_t address = 0x0080;
+	uint8_t data_buff[] = { "hola\n\r" };
 
 	//Init I2C master.
 	masterXfer.slaveAddress = EEPROM_SLAVE_ADDR;
 	masterXfer.direction = kI2C_Write;
-	masterXfer.subaddress = 0x0002;
+	masterXfer.subaddress = 0x0000;
 	masterXfer.subaddressSize = 2;
 	masterXfer.data = data_buff;
-	masterXfer.dataSize = 5;
+	masterXfer.dataSize = 7;
 	masterXfer.flags = kI2C_TransferDefaultFlag;
 
 	I2C_MasterTransferNonBlocking(I2C0_BASEADDR, &g_m_handle, &masterXfer);
 
 	//Wait for transfer completed.
 	xEventGroupWaitBits(get_g_I2C_events(),
-	EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(500));
+	EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(100));
 
 	for (;;) {
 
@@ -407,8 +456,6 @@ void UART0_readEEPROM_task(void * arg) {
 
 	uint8_t address_length[] = { "\r\n\t Introduzca bytes a leer: " };
 
-	uint8_t address_data[] = { "\r\n\t" };
-
 	xEventGroupClearBits(get_g_TERM0_events(),
 	EVENT_EEPROM_ADDR_FULL);
 
@@ -470,12 +517,7 @@ void UART0_readEEPROM_task(void * arg) {
 		if (EVENT_EEPROM_ADDR_FULL & xEventGroupGetBits(get_g_TERM0_events())) {
 			xEventGroupClearBits(get_g_TERM0_events(),
 			EVENT_EEPROM_ADDR_FULL);
-			xEventGroupSetBits(get_g_I2C_events(),
-			EVENT_I2C_START_ADDRESS_READY);
-			UART0_putString(address_data);
-			xQueueSendToBack(get_g_EEPROM_mailbox(), &realHexAddress, 10);
-			//UART0_putString(address_length);
-
+			UART0_putString(address_length);
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));
@@ -489,8 +531,6 @@ void UART1_readEEPROM_task(void * arg) {
 	uint8_t addrCharLength = 0;
 	uint8_t READ_EEPROM_address[] = { "\r\n\t Introduzca direccion a leer: 0x" };
 	uint8_t address_length[] = { "\r\n\t Introduzca bytes a leer: " };
-
-	uint16_t realHexAddress = 0;
 
 	xEventGroupClearBits(get_g_TERM1_events(), EVENT_EEPROM_ADDR_FULL);
 
@@ -526,9 +566,6 @@ void UART1_readEEPROM_task(void * arg) {
 					vTaskDelay(pdMS_TO_TICKS(10));
 					addrCharLength = 0;
 
-					realHexAddress = buffer[3] * 1 + buffer[2] * 16
-							+ buffer[1] * 16 * 16 + buffer[0] * 16 * 16 * 16;
-
 					if (EVENT_INVALID_CHAR
 							& xEventGroupGetBits(get_g_TERM1_events())) {
 						xEventGroupClearBits(get_g_TERM1_events(),
@@ -552,9 +589,7 @@ void UART1_readEEPROM_task(void * arg) {
 		if (EVENT_EEPROM_ADDR_FULL & xEventGroupGetBits(get_g_TERM1_events())) {
 			xEventGroupClearBits(get_g_TERM1_events(),
 			EVENT_EEPROM_ADDR_FULL);
-			xEventGroupSetBits(get_g_I2C_events(),
-			EVENT_I2C_START_ADDRESS_READY);
-			//UART1_putString(address_length);
+			UART1_putString(address_length);
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));

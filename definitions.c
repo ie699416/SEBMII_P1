@@ -22,9 +22,9 @@ QueueHandle_t g_UART0_mailbox;
 
 QueueHandle_t g_UART1_mailbox;
 
-QueueHandle_t g_RTC_mailbox;
+QueueHandle_t g_UART1_Chat_mailbox;
 
-QueueHandle_t g_EEPROM_mailbox;
+QueueHandle_t g_RTC_mailbox;
 
 uart_handle_t g_uart0Handle;
 
@@ -49,9 +49,9 @@ void createEvents() {
 
 	g_UART1_mailbox = xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
 
-	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
+	g_UART1_Chat_mailbox =xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
 
-	g_EEPROM_mailbox = xQueueCreate(QUEUE_EEPROM_LENGTH, QUEUE_EEPROM_ITEM_SIZE);
+	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
 
 }
 
@@ -71,12 +71,13 @@ QueueHandle_t get_g_UART1_mailbox() {
 	return g_UART1_mailbox;
 }
 
-QueueHandle_t get_g_RTC_mailbox() {
-	return g_RTC_mailbox;
+QueueHandle_t get_g_UART1_Chat_mailbox() {
+	return g_UART1_Chat_mailbox;
 }
 
-QueueHandle_t get_g_EEPROM_mailbox(){
-	return g_EEPROM_mailbox;
+
+QueueHandle_t get_g_RTC_mailbox() {
+	return g_RTC_mailbox;
 }
 
 
