@@ -134,7 +134,7 @@ void UART0_PrintEcho_task(void * arg) {
 					}
 			xEventGroupSetBits(get_g_TERM0_events(), EVENT_UART_RX);
 
-			if (ESCAPE_KEY != receiveXfer.data[0]) {
+			if (ESCAPE_KEY_CELL != receiveXfer.data[0]) {
 				if ((receiveXfer.data[0] >= '0' && receiveXfer.data[0] <= '9')
 
 				|| (receiveXfer.data[0] >= 'A' && receiveXfer.data[0] <= 'F')

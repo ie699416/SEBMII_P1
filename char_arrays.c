@@ -91,6 +91,11 @@ uint8_t * getComBtwTerm() {
 uint8_t * getMsgFromTerONE() {
 	return MsgFromTerONE;
 }
+
+uint8_t * getMsgFromTerTWO() {
+	return MsgFromTerTWO;
+}
+
 uint8_t * getJumpLine() {
 	return jumpLine;
 }

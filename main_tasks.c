@@ -43,9 +43,8 @@ void U0_systemMenu_task(void *arg) {
 
 	uint8_t xCharReceived;
 
-	UART0_putString(getMenu());
 	UART0_putString(getClearScreen());
-
+	UART0_putString(getMenu());
 
 	xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
 
@@ -57,7 +56,7 @@ void U0_systemMenu_task(void *arg) {
 		if ( xQueueReceive(get_g_UART0_mailbox(), &xCharReceived,
 				portMAX_DELAY) == pdPASS) {
 			switch (xCharReceived) {
-			case ESCAPE_KEY:
+			case ESCAPE_KEY_CELL:
 				UART0_putString(getClearScreen());
 				UART0_putString(getMenu());
 				xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
@@ -71,8 +70,12 @@ void U0_systemMenu_task(void *arg) {
 
 				xEventGroupSetBits(get_g_TERM0_events(),
 				EVENT_CHAT_TASK_ON);
+				xEventGroupSetBits(get_g_TERM1_events(),
+				EVENT_CHAT_TASK_ON);
 				UART0_putString(getClearScreen());
 				UART0_putString(getComBtwTerm());
+				UART1_putString(getClearScreen());
+				UART1_putString(getComBtwTerm());
 				break;
 			default:
 				xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
@@ -105,20 +108,25 @@ void U1_systemMenu_task(void *arg) {
 			case ESCAPE_KEY:
 				UART1_putString(getClearScreen());
 				UART1_putString(getMenu());
-				xEventGroupSetBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
+				xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
 				xEventGroupClearBits(get_g_TERM1_events(), EVENT_CHAT_TASK_ON);
 				break;
 			case '1':
 				xEventGroupSetBits(get_g_TERM1_events(),
-						EVENT_UART_READ_EEPROM);
+				EVENT_UART_READ_EEPROM);
 
 				break;
 			case '8':
 
 				xEventGroupSetBits(get_g_TERM1_events(),
 				EVENT_CHAT_TASK_ON);
+				xEventGroupSetBits(get_g_TERM0_events(),
+				EVENT_CHAT_TASK_ON);
+
 				UART1_putString(getClearScreen());
 				UART1_putString(getComBtwTerm());
+				UART0_putString(getClearScreen());
+				UART0_putString(getComBtwTerm());
 				break;
 			default:
 				xEventGroupSetBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
@@ -199,9 +207,7 @@ void sInitLCD_task(void * arg) {
 void Chat_Task_0(void *arg) {
 
 	xEventGroupWaitBits(get_g_TERM0_events(), EVENT_CHAT_TASK_ON, pdFALSE,
-			pdFALSE,portMAX_DELAY);
-
-
+	pdFALSE, portMAX_DELAY);
 
 	uint8_t chatBffr[2];
 	chatBffr[1] = '\0';
@@ -210,60 +216,64 @@ void Chat_Task_0(void *arg) {
 	uint8_t entersendBffrIndex = 0;
 	uint8_t index;
 	uint8_t *enterSendBffrRealLength;
-	bool chatQueueRecieve = pdFALSE;
+	uint8_t anotherIndex = 0;
+
 	for (;;) {
 
+		if ((EVENT_CHAT_TASK_ON & xEventGroupGetBits(get_g_TERM0_events()))) {
 
-
-		if  (   (EVENT_CHAT_TASK_ON & xEventGroupGetBits(get_g_TERM0_events()) )){
-
-
-
-		chatQueueRecieve = xQueueReceive(get_g_UART0_Chat_mailbox(),
-				&chatBffr[0], portMAX_DELAY);
-
-		if ( pdTRUE == chatQueueRecieve) {
+			xQueueReceive(get_g_UART0_Chat_mailbox(), &chatBffr[0],
+					portMAX_DELAY);
 
 			enterSendBffr[entersendBffrIndex] = chatBffr[0];
 			entersendBffrIndex++;
 
-
 			if ((chatBffr[0] == ENTER_KEY)) {
-				xEventGroupSetBits(get_g_TERM0_events(), UART_CHAT_ENTER_KEY);
+				xEventGroupSetBits(get_g_TERM0_events(),
+				UART_CHAT_ENTER_KEY);
 				enterSendBffrRealLength = pvPortMalloc(
 						sizeof(uint8_t) * entersendBffrIndex);
 
-				for (index = 0; index <= entersendBffrIndex; index++) {
-					enterSendBffrRealLength[index] = enterSendBffr[index];
+				for (index = 0; enterSendBffr[index] != ENTER_KEY; index++) {
+
+								}
+
+				for (anotherIndex = 0; anotherIndex < index; anotherIndex++) {
+					enterSendBffrRealLength[anotherIndex] =
+							enterSendBffr[anotherIndex];
 
 				}
-				UART0_putString(getJumpLine());
-				UART0_putString(getMsgFromTerONE());
-				xEventGroupSetBits(get_g_TERM0_events(), UART_CHAT_ENTER_KEY);
-				UART0_putString(enterSendBffrRealLength);
+				UART1_putString(getJumpLine());
+				UART1_putString(getMsgFromTerTWO());
+				xEventGroupSetBits(get_g_TERM0_events(),
+				UART_CHAT_ENTER_KEY);
+				UART1_putString(enterSendBffrRealLength);
+				UART1_putString(getJumpLine());
+				UART1_putString(getJumpLine());
+
 				UART0_putString(getJumpLine());
 				UART0_putString(getJumpLine());
 
-				for (resetChatBffrIndex = 0; resetChatBffrIndex < 200;
+				for (resetChatBffrIndex = 0; resetChatBffrIndex < 100;
 						resetChatBffrIndex++) {
-					enterSendBffr[resetChatBffrIndex] = 0x20;
+					enterSendBffrRealLength[resetChatBffrIndex] = 0x20;
 				}
 				vPortFree(enterSendBffrRealLength);
+				enterSendBffrRealLength = 0;
 				entersendBffrIndex = 0;
+				anotherIndex = 0;
+				index = 0;
 
 			}
-		}
 
-		vTaskDelay(pdMS_TO_TICKS(100));
+			vTaskDelay(pdMS_TO_TICKS(100));
 		}
 	}
 }
 void Chat_Task_1(void *arg) {
 
 	xEventGroupWaitBits(get_g_TERM1_events(), EVENT_CHAT_TASK_ON, pdFALSE,
-			pdFALSE,portMAX_DELAY);
-
-
+	pdFALSE, portMAX_DELAY);
 
 	uint8_t chatBffr[2];
 	chatBffr[1] = '\0';
@@ -271,56 +281,61 @@ void Chat_Task_1(void *arg) {
 	uint8_t resetChatBffrIndex;
 	uint8_t entersendBffrIndex = 0;
 	uint8_t index;
+	uint8_t anotherIndex = 0;
 	uint8_t *enterSendBffrRealLength;
-	bool chatQueueRecieve = pdFALSE;
+
 	for (;;) {
 
+		if ((EVENT_CHAT_TASK_ON & xEventGroupGetBits(get_g_TERM1_events()))) {
 
-
-//		 xEventGroupClearBits(get_g_TERM1_events(), EVENT_CHAT_TASK_ON);
-
-
-
-		if  (   (EVENT_CHAT_TASK_ON & xEventGroupGetBits(get_g_TERM1_events()) )){
-
-
-
-		chatQueueRecieve = xQueueReceive(get_g_UART1_Chat_mailbox(),
-				&chatBffr[0], portMAX_DELAY);
-
-		if ( pdTRUE == chatQueueRecieve) {
+			xQueueReceive(get_g_UART1_Chat_mailbox(), &chatBffr[0],
+					portMAX_DELAY);
 
 			enterSendBffr[entersendBffrIndex] = chatBffr[0];
 			entersendBffrIndex++;
 
-
+			/* Set an event to tell putString function that a message from chat had been sent
+			 * and it creates an array of the size of the message written*/
 			if ((chatBffr[0] == ENTER_KEY)) {
-				xEventGroupSetBits(get_g_TERM1_events(), UART_CHAT_ENTER_KEY);
+				xEventGroupSetBits(get_g_TERM1_events(),
+				UART_CHAT_ENTER_KEY);
 				enterSendBffrRealLength = pvPortMalloc(
 						sizeof(uint8_t) * entersendBffrIndex);
 
-				for (index = 0; index <= entersendBffrIndex; index++) {
-					enterSendBffrRealLength[index] = enterSendBffr[index];
+				for (index = 0; enterSendBffr[index] != ENTER_KEY; index++) {
 
 				}
-				UART1_putString(getJumpLine());
-				UART1_putString(getMsgFromTerONE());
-				xEventGroupSetBits(get_g_TERM1_events(), UART_CHAT_ENTER_KEY);
-				UART1_putString(enterSendBffrRealLength);
+
+				for (anotherIndex = 0; anotherIndex < index; anotherIndex++) {
+					enterSendBffrRealLength[anotherIndex] =
+							enterSendBffr[anotherIndex];
+
+				}
+				UART0_putString(getJumpLine());
+				UART0_putString(getMsgFromTerONE());
+				xEventGroupSetBits(get_g_TERM1_events(),
+				UART_CHAT_ENTER_KEY);
+				UART0_putString(enterSendBffrRealLength);
+				UART0_putString(getJumpLine());
+				UART0_putString(getJumpLine());
+
+
 				UART1_putString(getJumpLine());
 				UART1_putString(getJumpLine());
 
-				for (resetChatBffrIndex = 0; resetChatBffrIndex < 200;
+				for (resetChatBffrIndex = 0; resetChatBffrIndex < 105;
 						resetChatBffrIndex++) {
-					enterSendBffr[resetChatBffrIndex] = 0x20;
+					enterSendBffrRealLength[resetChatBffrIndex] = 0x20;
 				}
 				vPortFree(enterSendBffrRealLength);
+				enterSendBffrRealLength = 0;
 				entersendBffrIndex = 0;
+				anotherIndex = 0;
+				index = 0;
 
 			}
-		}
 
-		vTaskDelay(pdMS_TO_TICKS(100));
+			vTaskDelay(pdMS_TO_TICKS(100));
 		}
 	}
 }

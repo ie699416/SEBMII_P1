@@ -34,6 +34,7 @@
 /****************************************************************************************************************/
 /*	Local definitions*/
 
+#define ESCAPE_KEY_CELL 127
 #define ESCAPE_KEY 0x1B
 #define ENTER_KEY 0x0D
 
