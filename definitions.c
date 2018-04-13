@@ -24,6 +24,8 @@ QueueHandle_t g_UART1_mailbox;
 
 QueueHandle_t g_UART1_Chat_mailbox;
 
+QueueHandle_t g_UART0_Chat_mailbox;
+
 QueueHandle_t g_RTC_mailbox;
 
 uart_handle_t g_uart0Handle;
@@ -51,6 +53,8 @@ void createEvents() {
 
 	g_UART1_Chat_mailbox =xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
 
+	g_UART0_Chat_mailbox =xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
+
 	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
 
 }
@@ -73,6 +77,10 @@ QueueHandle_t get_g_UART1_mailbox() {
 
 QueueHandle_t get_g_UART1_Chat_mailbox() {
 	return g_UART1_Chat_mailbox;
+}
+
+QueueHandle_t get_g_UART0_Chat_mailbox() {
+	return g_UART0_Chat_mailbox;
 }
 
 
