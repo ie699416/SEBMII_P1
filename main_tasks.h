@@ -145,6 +145,8 @@ void UART0_readEEPROM_task(void * arg);
 
 void UART1_readEEPROM_task(void * arg);
 
-void Chat_Task();
+void Chat_Task_0();
+
+void Chat_Task_1();
 
 #endif /* MAIN_TASKS_H_ */

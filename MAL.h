@@ -6,7 +6,6 @@
  */
 #include "definitions.h"
 
-
 void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle,
 		status_t status, void *userData);
 
@@ -14,8 +13,7 @@ void UART1_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 		void *userData);
 
 void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
-		void *userData) ;
-
+		void *userData);
 
 /**********************************************************************************************************************
  * UART Tasks
@@ -67,5 +65,7 @@ void UART1_putString(uint8_t * dataToSend);
  *********************************************************************************************************************/
 
 void I2C_init_task();
+
+void I2C_Read_task();
 
 void I2C_Write_task();

@@ -6,6 +6,18 @@
  */
 #include "definitions.h"
 
+/****************************************************************************************************************/
+/*	Local function*/
+
+uint8_t toUpperCase(uint8_t * data) {
+	if (data[0] >= 'a' && data[0] <= 'z') {
+		data[0] -= 'a' - 'A';
+	}
+	return data[0];
+}
+
+/****************************************************************************************************************/
+
 EventGroupHandle_t g_TERM0_events;
 
 EventGroupHandle_t g_TERM1_events;
@@ -21,6 +33,10 @@ QueueHandle_t g_TERM1_EEPROM_address;
 QueueHandle_t g_UART0_mailbox;
 
 QueueHandle_t g_UART1_mailbox;
+
+QueueHandle_t g_UART1_Chat_mailbox;
+
+QueueHandle_t g_UART0_Chat_mailbox;
 
 QueueHandle_t g_RTC_mailbox;
 
@@ -54,6 +70,10 @@ void createEvents() {
 
 	g_UART1_mailbox = xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
 
+	g_UART1_Chat_mailbox = xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
+
+	g_UART0_Chat_mailbox = xQueueCreate(QUEUE_LENGTH_UART, QUEUE_ITEM_SIZE);
+
 	g_RTC_mailbox = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
 
 	g_EEPROM_mailbox = xQueueCreate(QUEUE_EEPROM_LENGTH,
@@ -79,6 +99,14 @@ QueueHandle_t get_g_UART0_mailbox() {
 
 QueueHandle_t get_g_UART1_mailbox() {
 	return g_UART1_mailbox;
+}
+
+QueueHandle_t get_g_UART1_Chat_mailbox() {
+	return g_UART1_Chat_mailbox;
+}
+
+QueueHandle_t get_g_UART0_Chat_mailbox() {
+	return g_UART0_Chat_mailbox;
 }
 
 QueueHandle_t get_g_RTC_mailbox() {
@@ -119,9 +147,12 @@ uart_handle_t * get_g_uart0Handle() {
 
 uart_handle_t * get_g_uart1Handle() {
 	return &g_uart1Handle;
+
 }
 
 i2c_master_handle_t * get_g_m_handle() {
 	return &g_m_handle;
 }
+
+
 

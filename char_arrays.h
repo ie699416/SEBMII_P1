@@ -8,4 +8,12 @@ uint8_t * getClearScreen() ;
 
 uint8_t * getITESO();
 
+uint8_t * getComBtwTerm();
+
+uint8_t * getMsgFromTerONE();
+
+uint8_t * getJumpLine();
+
+
+
 #endif /* CHAR_ARRAYS_H_ */

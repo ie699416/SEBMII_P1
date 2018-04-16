@@ -74,6 +74,8 @@ void UART0_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 
 void UART1_init_task(void * arg) {
 
+	CLOCK_EnableClock(kCLOCK_PortC);
+
 	port_pin_config_t config_uart = { kPORT_PullDisable, kPORT_SlowSlewRate,
 			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
 			kPORT_LowDriveStrength, kPORT_MuxAlt3, kPORT_UnlockRegister, };
@@ -81,9 +83,10 @@ void UART1_init_task(void * arg) {
 	PORT_SetPinConfig(PORTC, 4, &config_uart);
 	PORT_SetPinConfig(PORTC, 3, &config_uart);
 
+	CLOCK_EnableClock(kCLOCK_Uart1);
 	uart_config_t user_config;
 	UART_GetDefaultConfig(&user_config);
-	user_config.baudRate_Bps = 9600;
+	user_config.baudRate_Bps = 38400;
 	user_config.enableTx = true;
 	user_config.enableRx = true;
 
@@ -132,10 +135,14 @@ void UART0_PrintEcho_task(void * arg) {
 		if (EVENT_UART0_RX & xEventGroupGetBits(get_g_UART_events())) {
 			xEventGroupClearBits(get_g_UART_events(), EVENT_UART0_RX);
 
+			if (EVENT_CHAT_TASK_ON & xEventGroupGetBits(get_g_TERM0_events())) {
+				xQueueSendToBack(get_g_UART0_Chat_mailbox(), receiveXfer.data,
+						10);
+			}
 			xEventGroupSetBits(get_g_TERM0_events(), EVENT_UART_RX);
 
-			if (ESCAPE_KEY != receiveXfer.data[0]) {
-				xEventGroupSetBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
+			if (ESCAPE_KEY == receiveXfer.data[0]) {
+				xEventGroupSetBits(get_g_TERM0_events(), EVENT_ESC_OVR);
 			}
 
 			receiveXfer.data[0] = toUpperCase(receiveXfer.data);
@@ -146,8 +153,8 @@ void UART0_PrintEcho_task(void * arg) {
 						10);
 			}
 
-			if (EVENT_MENU_WAIT & xEventGroupGetBits(get_g_TERM0_events())) {
-				xEventGroupClearBits(get_g_TERM0_events(), EVENT_MENU_WAIT);
+			if ((EVENT_ESC_OVR | EVENT_MENU_WAIT)
+					& xEventGroupGetBits(get_g_TERM0_events())) {
 				xQueueSendToBack(get_g_UART0_mailbox(), receiveXfer.data, 10);
 				xEventGroupSetBits(get_g_TERM0_events(), EVENT_CHAR_SENT);
 			}
@@ -196,10 +203,14 @@ void UART1_PrintEcho_task(void * arg) {
 		if (EVENT_UART1_RX & xEventGroupGetBits(get_g_UART_events())) {
 			xEventGroupClearBits(get_g_UART_events(), EVENT_UART1_RX);
 
+			if (EVENT_CHAT_TASK_ON & xEventGroupGetBits(get_g_TERM1_events())) {
+				xQueueSendToBack(get_g_UART1_Chat_mailbox(), receiveXfer.data,
+						10);
+			}
 			xEventGroupSetBits(get_g_TERM1_events(), EVENT_UART_RX);
 
-			if (ESCAPE_KEY != receiveXfer.data[0]) {
-				xEventGroupSetBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
+			if (ESCAPE_KEY == receiveXfer.data[0]) {
+				xEventGroupSetBits(get_g_TERM1_events(), EVENT_ESC_OVR);
 			}
 
 			receiveXfer.data[0] = toUpperCase(receiveXfer.data);
@@ -211,8 +222,8 @@ void UART1_PrintEcho_task(void * arg) {
 						10);
 			}
 
-			if (EVENT_MENU_WAIT & xEventGroupGetBits(get_g_TERM1_events())) {
-				xEventGroupClearBits(get_g_TERM1_events(), EVENT_MENU_WAIT);
+			if ((EVENT_ESC_OVR | EVENT_MENU_WAIT)
+					& xEventGroupGetBits(get_g_TERM1_events())) {
 				xQueueSendToBack(get_g_UART1_mailbox(), receiveXfer.data, 10);
 				xEventGroupSetBits(get_g_TERM1_events(), EVENT_CHAR_SENT);
 			}
@@ -244,53 +255,214 @@ void UART1_PrintEcho_task(void * arg) {
 
 void UART0_putString(uint8_t * dataToSend) {
 
+	EventBits_t uartEvents;
 	uart_transfer_t sendXfer;
-	volatile uint8_t index = 0;
+	uint8_t index = 0;
+	uint8_t indexFromChat = 0;
+	uint8_t indexFromChat2 = 0;
+	uint8_t putStringRet = 0;
+	uint8_t ev;
+	bool MsgFromChatFlag = pdFALSE;
+	uint8_t fixCursorForChat = '\r';
 
-	for (index; (dataToSend[index] != '\0'); index++) {
+	uint8_t *dataToSendAux = dataToSend;
+
+	/*Stores an event weather or not a Message from chat had been sent.*/
+	uartEvents = xEventGroupGetBits(get_g_TERM0_events());
+	/* getting the length from the Message to print only valid characters*/
+	for (index = 0; (dataToSend[index] != '\0'); index++) {
+
 	}
 
 	uint8_t sendData[index];
 
+	/* Fills a new array with correct length with the message, for printing valid characters.
+	 * Then checks weather or not a Message from chat had been sent, this conditional its for
+	 * preserve the integrity of the message to print on terminal.*/
 	for (index = 0; (dataToSend[index] != '\0'); index++) {
 		sendData[index] = dataToSend[index];
+		dataToSendAux++;
+		if ((*dataToSendAux == ENTER_KEY)
+				&& (UART_CHAT_ENTER_KEY == (UART_CHAT_ENTER_KEY & uartEvents))) {
+			for (indexFromChat = 0; (indexFromChat <= index); indexFromChat++) {
+			}
+			MsgFromChatFlag = pdTRUE;
+		}
+
+	}
+	/* Creating a New array for a Message from chat for integrity of it */
+	uint8_t sendDataFromChat[indexFromChat];
+
+	for (indexFromChat2 = 0; indexFromChat2 <= indexFromChat;
+			indexFromChat2++) {
+		sendDataFromChat[indexFromChat2] = sendData[indexFromChat2];
 	}
 
-	// Prepare to send.
-	sendXfer.data = sendData;
-	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
-	// Send out.
+	/*If the message had a ENTER_KEY and the message is from the chat
+	 * sends the SendDataFromChat Array else Send Normal echo*/
+	if (( UART_CHAT_ENTER_KEY == ( UART_CHAT_ENTER_KEY & uartEvents))
+			&& (pdTRUE == MsgFromChatFlag)) {
+		xEventGroupClearBits(get_g_TERM0_events(), UART_CHAT_ENTER_KEY);
+		// Prepare to send.
+		sendXfer.data = &fixCursorForChat;
+		sendXfer.dataSize = 1;
 
-	UART_TransferSendNonBlocking(UART0, get_g_uart0Handle(), &sendXfer);
-	// Wait send finished.
-	xEventGroupWaitBits(get_g_UART_events(), EVENT_UART0_TX, pdTRUE, pdFALSE,
-	portMAX_DELAY); // wait fir the the callback flag
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART0, get_g_uart0Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART0_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+		// Prepare to send.
+		sendXfer.data = sendDataFromChat;
+		sendXfer.dataSize = sizeof(sendDataFromChat)
+				/ sizeof(sendDataFromChat[0]);
+
+		// Send out
+		UART_TransferSendNonBlocking(UART0, get_g_uart0Handle(), &sendXfer);
+
+		// Wait send finished.
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART0_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+		sendXfer.data = &fixCursorForChat;
+		sendXfer.dataSize = 1;
+
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART0, get_g_uart0Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART0_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait for the the callback flag
+
+	} else {
+		// Prepare to send.
+		sendXfer.data = sendData;
+		sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
+
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART0, get_g_uart0Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART0_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+	}
 
 }
 
 void UART1_putString(uint8_t * dataToSend) {
 
+	EventBits_t uartEvents;
 	uart_transfer_t sendXfer;
-	volatile uint8_t index = 0;
+	uint8_t index = 0;
+	uint8_t indexFromChat = 0;
+	uint8_t indexFromChat2 = 0;
+	uint8_t putStringRet = 0;
+	uint8_t ev;
+	bool MsgFromChatFlag = pdFALSE;
+	uint8_t fixCursorForChat = '\r';
 
-	for (index; (dataToSend[index] != '\0'); index++) {
+	uint8_t *dataToSendAux = dataToSend;
+
+	/*Stores an event weather or not a Message from chat had been sent.*/
+	uartEvents = xEventGroupGetBits(get_g_TERM1_events());
+	/* getting the length from the Message to print only valid characters*/
+	for (index = 0; (dataToSend[index] != '\0'); index++) {
+
 	}
-
 	uint8_t sendData[index];
 
+	/* Fills a new array with correct length with the message, for printing valid characters.
+	 * Then checks weather or not a Message from chat had been sent, this conditional its for
+	 * preserve the integrity of the message to print on terminal.*/
 	for (index = 0; (dataToSend[index] != '\0'); index++) {
 		sendData[index] = dataToSend[index];
+		dataToSendAux++;
+		if ((*dataToSendAux == ENTER_KEY)
+				&& (UART_CHAT_ENTER_KEY == (UART_CHAT_ENTER_KEY & uartEvents))) {
+			for (indexFromChat = 0; (indexFromChat <= index); indexFromChat++) {
+			}
+			MsgFromChatFlag = pdTRUE;
+		}
+
+	}
+	/* Creating a New array for a Message from chat for integrity of it */
+	uint8_t sendDataFromChat[indexFromChat];
+
+	for (indexFromChat2 = 0; indexFromChat2 <= indexFromChat;
+			indexFromChat2++) {
+		sendDataFromChat[indexFromChat2] = sendData[indexFromChat2];
 	}
 
-	// Prepare to send.
-	sendXfer.data = sendData;
-	sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
-	// Send out.
+	/*If the message had a ENTER_KEY and the message is from the chat
+	 * sends the SendDataFromChat Array else Send Normal echo*/
+	if (( UART_CHAT_ENTER_KEY == ( UART_CHAT_ENTER_KEY & uartEvents))
+			&& (pdTRUE == MsgFromChatFlag)) {
+		xEventGroupClearBits(get_g_TERM1_events(), UART_CHAT_ENTER_KEY);
+		// Prepare to send.
+		sendXfer.data = &fixCursorForChat;
+		sendXfer.dataSize = 1;
 
-	UART_TransferSendNonBlocking(UART1, get_g_uart1Handle(), &sendXfer);
-	// Wait send finished.
-	xEventGroupWaitBits(get_g_UART_events(), EVENT_UART1_TX, pdTRUE, pdFALSE,
-	portMAX_DELAY); // wait fir the the callback flag
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART1, get_g_uart1Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART1_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+		// Prepare to send.
+		sendXfer.data = sendDataFromChat;
+		sendXfer.dataSize = sizeof(sendDataFromChat)
+				/ sizeof(sendDataFromChat[0]);
+
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART1, get_g_uart1Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART1_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+		sendXfer.data = &fixCursorForChat;
+		sendXfer.dataSize = 1;
+
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART1, get_g_uart1Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART1_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+	} else {
+		// Prepare to send.
+		sendXfer.data = sendData;
+		sendXfer.dataSize = sizeof(sendData) / sizeof(sendData[0]);
+
+		// Send out.d
+
+		UART_TransferSendNonBlocking(UART1, get_g_uart1Handle(), &sendXfer);
+		// Wait send finished.
+
+		xEventGroupWaitBits(get_g_UART_events(), EVENT_UART1_TX, pdTRUE,
+		pdFALSE,
+		portMAX_DELAY); // wait fir the the callback flag
+
+	}
+
 }
 
 /**********************************************************************************************************************
@@ -298,6 +470,9 @@ void UART1_putString(uint8_t * dataToSend) {
  *********************************************************************************************************************/
 
 void I2C_init_task() {
+
+	CLOCK_EnableClock(kCLOCK_I2c0);
+	CLOCK_EnableClock(kCLOCK_PortE);
 
 	port_pin_config_t config_i2c = { kPORT_PullDisable, kPORT_SlowSlewRate,
 			kPORT_PassiveFilterDisable, kPORT_OpenDrainDisable,
@@ -311,7 +486,7 @@ void I2C_init_task() {
 	I2C_MasterGetDefaultConfig(&masterConfig);
 	I2C_MasterInit(I2C0_BASEADDR, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
 	I2C_MasterTransferCreateHandle(I2C0_BASEADDR, get_g_m_handle(),
-			i2c_master_callback, NULL);
+			i2c_master_2_callback, NULL);
 	vTaskDelete(NULL);
 }
 
@@ -330,11 +505,12 @@ void I2C_Read_task() {
 			masterXfer = masterXferPtr[0];
 
 			I2C_MasterTransferCreateHandle(I2C0_BASEADDR, get_g_m_handle(),
-					i2c_master_callback, NULL);
+					i2c_master_2_callback, NULL);
 
 			I2C_MasterTransferNonBlocking(I2C0, get_g_m_handle(), &masterXfer);
+
 			xEventGroupWaitBits(get_g_I2C_events(),
-			EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(100));
+			EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(1000));
 
 		}
 	}
@@ -354,16 +530,11 @@ void I2C_Write_task() {
 			masterXfer = masterXferPtr[0];
 
 			I2C_MasterTransferCreateHandle(I2C0_BASEADDR, get_g_m_handle(),
-					i2c_master_callback, NULL);
+					i2c_master_2_callback, NULL);
 
 			I2C_MasterTransferNonBlocking(I2C0_BASEADDR, get_g_m_handle(),
 					&masterXfer);
 
-			while (g_MasterComplete != true) {
-
-			}
-
-			g_MasterComplete = false;
 			xEventGroupWaitBits(get_g_I2C_events(),
 			EVENT_I2C_MASTER_TX_COMPLETE, pdTRUE, pdFALSE, pdMS_TO_TICKS(1000));
 
